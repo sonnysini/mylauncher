@@ -11,6 +11,11 @@ import app.mylauncher.data.WeatherRepository
 import app.mylauncher.data.nuvio.ContinueItem
 import app.mylauncher.data.nuvio.NuvioApi
 import app.mylauncher.data.nuvio.NuvioRepository
+import app.mylauncher.data.opentv.Match
+import app.mylauncher.data.opentv.MatchPhase
+import app.mylauncher.data.opentv.OpenTvData
+import app.mylauncher.data.opentv.OpenTvRepository
+import app.mylauncher.data.opentv.TvChannel
 import app.mylauncher.data.ordered
 import android.os.SystemClock
 import kotlinx.coroutines.Job
@@ -41,6 +46,15 @@ data class NuvioState(
     val error: Boolean = false,
 )
 
+data class OpenTvState(
+    val installed: Boolean = false,
+    val permitted: Boolean = false,
+    val data: OpenTvData = OpenTvData(),
+    val loaded: Boolean = false,
+) {
+    val anyLive: Boolean get() = data.matches.any { it.phase == MatchPhase.LIVE }
+}
+
 data class AppsState(val visible: List<AppEntry> = emptyList(), val hidden: List<AppEntry> = emptyList())
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -52,6 +66,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val nuvio = NuvioRepository(app)
 
     private val installed = MutableStateFlow<List<AppEntry>>(emptyList())
+
+    private val openTv = OpenTvRepository(app)
+    private val _openTv = MutableStateFlow(OpenTvState())
+    val openTvState: StateFlow<OpenTvState> = _openTv.asStateFlow()
+    private var openTvJob: Job? = null
 
     val apps: StateFlow<AppsState> = combine(installed, prefs.layout) { list, layout ->
         val sorted = list.ordered(layout.order) { it.packageName }
@@ -111,6 +130,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun nuvioIntent(item: ContinueItem) = nuvio.openIntent(item)
+
+    /** OpenTV's rows: on every return home and on a timer (faster while a match is live). */
+    fun refreshOpenTv() {
+        if (openTvJob?.isActive == true) return
+        openTvJob = viewModelScope.launch {
+            val installed = openTv.installed
+            val permitted = installed && openTv.permitted
+            val data = if (permitted) runCatching { openTv.load() }.getOrNull() else OpenTvData()
+            _openTv.value = OpenTvState(installed, permitted, data ?: _openTv.value.data, loaded = true)
+        }
+    }
+
+    fun channelIntent(channel: TvChannel) = openTv.channelIntent(channel)
+    fun matchIntent(match: Match) = openTv.matchIntent(match)
+    fun footballIntent() = openTv.footballIntent()
 
     fun startLogin() {
         loginJob?.cancel()
