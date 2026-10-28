@@ -26,7 +26,11 @@ class MainActivity : ComponentActivity() {
     private val homePressed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private val packageReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = viewModel.reloadApps()
+        override fun onReceive(context: Context, intent: Intent) {
+            viewModel.reloadApps()
+            // OpenTV installed or updated: its provider (and the permission) may have just appeared.
+            viewModel.refreshOpenTv()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +51,14 @@ class MainActivity : ComponentActivity() {
                 while (true) {
                     viewModel.refreshNuvio()
                     delay(10 * 60_000L)
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    viewModel.refreshOpenTv()
+                    delay(if (viewModel.openTvState.value.anyLive) 60_000L else 5 * 60_000L)
                 }
             }
         }

@@ -62,6 +62,8 @@ import app.mylauncher.HomeViewModel
 import app.mylauncher.LoginState
 import app.mylauncher.data.AppEntry
 import app.mylauncher.data.nuvio.ContinueItem
+import app.mylauncher.data.opentv.Match
+import app.mylauncher.data.opentv.TvChannel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.Flow
@@ -75,6 +77,8 @@ private fun isOk(key: Key) = key == Key.DirectionCenter || key == Key.Enter || k
 private sealed interface Focused {
     data class App(val app: AppEntry) : Focused
     data class Nuvio(val item: ContinueItem) : Focused
+    data class Game(val match: Match) : Focused
+    data class Tv(val channel: TvChannel) : Focused
 }
 
 private enum class Overlay { None, Settings, Profiles, Login, Hidden }
@@ -92,9 +96,18 @@ fun HomeScreen(
     val login by viewModel.login.collectAsStateWithLifecycle()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val profileId by viewModel.profileId.collectAsStateWithLifecycle()
+    val openTv by viewModel.openTvState.collectAsStateWithLifecycle()
+    val matches = openTv.data.matches
+    val tvChannels = openTv.data.channels
+    // A match on now: Calcio goes to the top and takes the first focus.
+    val liveFirst = openTv.anyLive
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(openTv) { now = System.currentTimeMillis() }
 
     val appsListState = rememberLazyListState()
     val nuvioListState = rememberLazyListState()
+    val calcioListState = rememberLazyListState()
+    val tvListState = rememberLazyListState()
     val rowsScroll = rememberScrollState()
     val requesters = remember { mutableStateMapOf<String, FocusRequester>() }
     fun requesterFor(key: String) = requesters.getOrPut(key) { FocusRequester() }
@@ -113,17 +126,22 @@ fun HomeScreen(
         runCatching { requesterFor("app:$target").requestFocus() }
     }
 
-    /** Top-left of the home: first "Continua a guardare" tile, else the first app. */
+    /** Top-left of the home: a live match, else the first "Continua a guardare" tile, else the first app. */
     fun focusHome(): Boolean {
+        val live = matches.firstOrNull().takeIf { liveFirst }
         val first = nuvio.items.firstOrNull()
-        val key = if (first != null) "nuvio:${first.contentId}" else "app:${apps.visible.firstOrNull()?.packageName ?: return false}"
+        val key = when {
+            live != null -> "match:${live.id}"
+            first != null -> "nuvio:${first.contentId}"
+            else -> "app:${apps.visible.firstOrNull()?.packageName ?: return false}"
+        }
         return runCatching { requesterFor(key).requestFocus() }.isSuccess
     }
 
-    LaunchedEffect(apps.visible.isNotEmpty(), nuvio.items.isNotEmpty()) {
+    LaunchedEffect(apps.visible.isNotEmpty(), nuvio.items.isNotEmpty(), liveFirst) {
         if (apps.visible.isEmpty()) return@LaunchedEffect
         // Nuvio loads after the app list: move to it once, unless the user already went somewhere.
-        if (!initialFocusDone || (!userMoved && nuvio.items.isNotEmpty())) {
+        if (!initialFocusDone || (!userMoved && (nuvio.items.isNotEmpty() || liveFirst))) {
             initialFocusDone = focusHome()
         }
     }
@@ -134,6 +152,9 @@ fun HomeScreen(
             rowsScroll.scrollTo(0)
             appsListState.scrollToItem(0)
             nuvioListState.scrollToItem(0)
+            calcioListState.scrollToItem(0)
+            tvListState.scrollToItem(0)
+            viewModel.refreshOpenTv()
             focusHome()
             userMoved = false
         }
@@ -164,6 +185,35 @@ fun HomeScreen(
             Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(190.dp))
 
             Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rowsScroll)) {
+                @Composable
+                fun CalcioRow() {
+                    if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
+                    RowTitle("Calcio", if (liveFirst) "Serie A · in diretta ora" else "Serie A · da OpenTV")
+                    LazyRow(
+                        state = calcioListState,
+                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        items(matches, key = { "match:${it.id}" }) { match ->
+                            MatchCard(
+                                match,
+                                Modifier
+                                    .size(CardWidth, CardHeight)
+                                    .focusRequester(requesterFor("match:${match.id}"))
+                                    .onFocusChanged { if (it.isFocused) focused = Focused.Game(match) },
+                            ) { onLaunch(viewModel.matchIntent(match)) }
+                        }
+                        item(key = "__calcio_all") {
+                            TextCard(
+                                if (matches.isEmpty()) "Nessuna partita · apri Calcio" else "Tutte ›",
+                                Modifier.onFocusChanged { if (it.isFocused) focused = null },
+                            ) { onLaunch(viewModel.footballIntent()) }
+                        }
+                    }
+                }
+
+                if (liveFirst) CalcioRow()
+
                 if (nuvio.available) {
                     RowTitle("Continua a guardare", "Nuvio")
                     LazyRow(
@@ -195,6 +245,28 @@ fun HomeScreen(
                                         .onFocusChanged { if (it.isFocused) focused = Focused.Nuvio(item) },
                                 ) { onLaunch(viewModel.nuvioIntent(item)) }
                             }
+                        }
+                    }
+                }
+
+                if (!liveFirst) CalcioRow()
+
+                if (openTv.permitted && tvChannels.isNotEmpty()) {
+                    RowTitle("OpenTV", "Visti di recente e preferiti")
+                    LazyRow(
+                        state = tvListState,
+                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        items(tvChannels, key = { "tv:${it.id}" }) { channel ->
+                            ChannelCard(
+                                channel,
+                                now,
+                                Modifier
+                                    .size(CardWidth, CardHeight)
+                                    .focusRequester(requesterFor("tv:${channel.id}"))
+                                    .onFocusChanged { if (it.isFocused) focused = Focused.Tv(channel) },
+                            ) { onLaunch(viewModel.channelIntent(channel)) }
                         }
                     }
                 }
@@ -377,6 +449,8 @@ private fun Hero(focused: Focused?, moving: Boolean, modifier: Modifier) {
                 Spacer(Modifier.height(6.dp))
                 Text(item.description, fontSize = 14.sp, color = Color(0xFFC9D1DE), maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
+            is Focused.Game -> MatchHero(focused.match)
+            is Focused.Tv -> ChannelHero(focused.channel)
             null -> Unit
         }
     }
