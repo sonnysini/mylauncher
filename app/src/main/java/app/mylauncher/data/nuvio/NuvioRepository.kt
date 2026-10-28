@@ -31,6 +31,7 @@ class NuvioRepository(context: Context) {
     val store = NuvioStore(context)
     val api = NuvioApi(store)
     private val cinemeta = Cinemeta()
+    private val tmdb = Tmdb()
 
     val signedIn: Flow<Boolean> = store.signedIn
 
@@ -50,13 +51,17 @@ class NuvioRepository(context: Context) {
         val meta = cinemeta.meta(p.contentType, p.contentId)
         val isSeries = p.contentType == "series" && p.season != null && p.episode != null
 
+        // Italian where TMDB has it; Cinemeta (English) fills the gaps.
+        val italian = tmdb.title(p.contentType, p.contentId)
+        val title = italian?.title ?: meta?.name ?: p.contentId
+
         if (!isSeries) {
             if (finished) return null
             return ContinueItem(
                 contentId = p.contentId, type = p.contentType,
-                title = meta?.name ?: p.contentId,
+                title = title,
                 subtitle = meta?.year.orEmpty(),
-                description = meta?.description.orEmpty(),
+                description = italian?.overview ?: meta?.description.orEmpty(),
                 image = meta?.background ?: meta?.poster, backdrop = meta?.background, logo = meta?.logo,
                 progress = fraction, minutesLeft = minutesLeft(p),
             )
@@ -69,12 +74,16 @@ class NuvioRepository(context: Context) {
         else episodes.getOrNull(index)
         val season = shown?.season ?: p.season!!
         val episode = shown?.episode ?: p.episode!!
-        val label = "S$season E$episode" + (shown?.title?.takeIf(String::isNotBlank)?.let { " · $it" } ?: "")
+        val italianEpisode = tmdb.episode(p.contentId, season, episode)
+        val episodeTitle = italianEpisode?.title ?: shown?.title?.takeIf(String::isNotBlank)
+        val label = "S$season E$episode" + (episodeTitle?.let { " · $it" } ?: "")
         return ContinueItem(
             contentId = p.contentId, type = p.contentType,
-            title = meta?.name ?: p.contentId,
+            title = title,
             subtitle = if (finished) "Prossimo: $label" else label,
-            description = shown?.overview?.takeIf(String::isNotBlank) ?: meta?.description.orEmpty(),
+            description = italianEpisode?.overview
+                ?: shown?.overview?.takeIf(String::isNotBlank)
+                ?: italian?.overview ?: meta?.description.orEmpty(),
             image = shown?.thumbnail ?: meta?.background, backdrop = meta?.background, logo = meta?.logo,
             progress = if (finished) null else fraction,
             minutesLeft = if (finished) null else minutesLeft(p),

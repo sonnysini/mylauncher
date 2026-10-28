@@ -22,6 +22,8 @@ android {
         // builds from the environment. Empty values just hide the Nuvio row.
         buildConfigField("String", "NUVIO_SUPABASE_URL", "\"${env("NUVIO_SUPABASE_URL")}\"")
         buildConfigField("String", "NUVIO_SUPABASE_ANON_KEY", "\"${env("NUVIO_SUPABASE_ANON_KEY")}\"")
+        // Italian titles and plots; without it the texts stay in English (Cinemeta).
+        buildConfigField("String", "TMDB_API_KEY", "\"${env("TMDB_API_KEY")}\"")
     }
 
     signingConfigs {
