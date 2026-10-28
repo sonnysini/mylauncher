@@ -64,6 +64,7 @@ fun OptionsOverlay(title: String, options: List<Pair<String, () -> Unit>>, onDis
                         else -> true
                     }
                 }
+                .trapFocus()
                 .width(420.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF161D2A))

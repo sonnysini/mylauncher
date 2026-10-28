@@ -9,7 +9,12 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 import app.mylauncher.ui.HomeScreen
 import app.mylauncher.ui.LauncherTheme
 
@@ -36,6 +41,15 @@ class MainActivity : ComponentActivity() {
                 addDataScheme("package")
             },
         )
+        // Fresh "Continua a guardare" on every return home, and every few minutes while shown.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    viewModel.refreshNuvio()
+                    delay(10 * 60_000L)
+                }
+            }
+        }
         setContent {
             LauncherTheme {
                 HomeScreen(
