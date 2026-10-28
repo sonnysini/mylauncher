@@ -2,8 +2,14 @@ package app.mylauncher.ui
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,8 +26,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +47,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -61,6 +74,7 @@ import androidx.tv.material3.Text
 import app.mylauncher.HomeViewModel
 import app.mylauncher.LoginState
 import app.mylauncher.data.AppEntry
+import app.mylauncher.data.HomeRow
 import app.mylauncher.data.nuvio.ContinueItem
 import app.mylauncher.data.opentv.Match
 import app.mylauncher.data.opentv.TvChannel
@@ -81,7 +95,25 @@ private sealed interface Focused {
     data class Tv(val channel: TvChannel) : Focused
 }
 
-private enum class Overlay { None, Settings, Profiles, Login, Hidden }
+/** Stable identity of the focused tile, so the hero only animates when the tile changes. */
+private val Focused.key: String
+    get() = when (this) {
+        is Focused.App -> "app:${app.packageName}"
+        is Focused.Nuvio -> "nuvio:${item.contentId}"
+        is Focused.Game -> "match:${match.id}"
+        is Focused.Tv -> "tv:${channel.id}"
+    }
+
+/** Image the background glow takes its colour from. */
+private val Focused.colorSource: Any?
+    get() = when (this) {
+        is Focused.App -> app.banner ?: app.icon
+        is Focused.Nuvio -> item.image ?: item.backdrop
+        is Focused.Game -> match.homeCrest
+        is Focused.Tv -> channel.logo
+    }
+
+private enum class Overlay { None, Settings, Profiles, Login, Hidden, Rows, City }
 
 @Composable
 fun HomeScreen(
@@ -97,10 +129,14 @@ fun HomeScreen(
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val profileId by viewModel.profileId.collectAsStateWithLifecycle()
     val openTv by viewModel.openTvState.collectAsStateWithLifecycle()
+    val rowOrder by viewModel.rows.collectAsStateWithLifecycle()
+    val city by viewModel.city.collectAsStateWithLifecycle()
+    val citySearch by viewModel.citySearch.collectAsStateWithLifecycle()
     val matches = openTv.data.matches
     val tvChannels = openTv.data.channels
     // A match on now: Calcio goes to the top and takes the first focus.
     val liveFirst = openTv.anyLive
+    val rows = if (liveFirst) listOf(HomeRow.CALCIO) + (rowOrder - HomeRow.CALCIO) else rowOrder
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(openTv) { now = System.currentTimeMillis() }
 
@@ -119,6 +155,7 @@ fun HomeScreen(
     var movingArmed by remember { mutableStateOf(false) }
     var initialFocusDone by remember { mutableStateOf(false) }
     var userMoved by remember { mutableStateOf(false) }
+    var restoreFocus by remember { mutableStateOf(false) }
 
     fun refocusApp(pkg: String?) {
         val target = pkg?.takeIf { p -> apps.visible.any { it.packageName == p } }
@@ -126,24 +163,27 @@ fun HomeScreen(
         runCatching { requesterFor("app:$target").requestFocus() }
     }
 
-    /** Top-left of the home: a live match, else the first "Continua a guardare" tile, else the first app. */
-    fun focusHome(): Boolean {
-        val live = matches.firstOrNull().takeIf { liveFirst }
-        val first = nuvio.items.firstOrNull()
-        val key = when {
-            live != null -> "match:${live.id}"
-            first != null -> "nuvio:${first.contentId}"
-            else -> "app:${apps.visible.firstOrNull()?.packageName ?: return false}"
+    /** First tile of the topmost row that has one (a live match always comes first). */
+    fun firstTileKey(): String? = rows.firstNotNullOfOrNull { row ->
+        when (row) {
+            HomeRow.CALCIO -> matches.firstOrNull()?.takeIf { openTv.permitted }?.let { "match:${it.id}" }
+            HomeRow.NUVIO -> nuvio.items.firstOrNull()?.let { "nuvio:${it.contentId}" }
+            HomeRow.OPENTV -> tvChannels.firstOrNull()?.takeIf { openTv.permitted }?.let { "tv:${it.id}" }
+            HomeRow.APPS -> apps.visible.firstOrNull()?.let { "app:${it.packageName}" }
         }
+    }
+
+    fun focusHome(): Boolean {
+        val key = firstTileKey() ?: return false
         return runCatching { requesterFor(key).requestFocus() }.isSuccess
     }
 
-    LaunchedEffect(apps.visible.isNotEmpty(), nuvio.items.isNotEmpty(), liveFirst) {
-        if (apps.visible.isEmpty()) return@LaunchedEffect
-        // Nuvio loads after the app list: move to it once, unless the user already went somewhere.
-        if (!initialFocusDone || (!userMoved && (nuvio.items.isNotEmpty() || liveFirst))) {
-            initialFocusDone = focusHome()
-        }
+    val firstKey = firstTileKey()
+    LaunchedEffect(firstKey) {
+        if (firstKey == null) return@LaunchedEffect
+        // Nuvio and OpenTV load after the app list: follow the top row once, unless the user
+        // already went somewhere.
+        if (!initialFocusDone || !userMoved) initialFocusDone = focusHome()
     }
     LaunchedEffect(homePressed) {
         homePressed.collect {
@@ -162,10 +202,7 @@ fun HomeScreen(
     LaunchedEffect(apps.visible, moving) {
         val pkg = moving ?: return@LaunchedEffect
         val index = apps.visible.indexOfFirst { it.packageName == pkg }
-        val shown = appsListState.layoutInfo.visibleItemsInfo.map { it.index }
-        if (index >= 0 && (shown.isEmpty() || index <= shown.first() || index >= shown.last())) {
-            appsListState.animateScrollToItem((index - 1).coerceAtLeast(0))
-        }
+        if (index >= 0) appsListState.keepWithNeighbours(index)
     }
 
     BackHandler(enabled = true) {}
@@ -177,14 +214,15 @@ fun HomeScreen(
             .background(Background)
             .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown) userMoved = true; false },
     ) {
-        Backdrop((focused as? Focused.Nuvio)?.item?.backdrop)
+        val glow by animateColorAsState(rememberImageColor(focused?.colorSource) ?: Accent, tween(500), label = "glow")
+        Backdrop((focused as? Focused.Nuvio)?.item?.backdrop, glow)
 
         Column(Modifier.fillMaxSize().padding(top = 28.dp)) {
             Header(weather, onOpenSettings = { overlay = Overlay.Settings }, modifier = Modifier.padding(horizontal = 48.dp))
 
             Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(190.dp))
 
-            Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rowsScroll)) {
+            Column(Modifier.fillMaxWidth().weight(1f).fadeTop(rowsScroll.value > 0).verticalScroll(rowsScroll)) {
                 @Composable
                 fun CalcioRow() {
                     if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
@@ -212,9 +250,9 @@ fun HomeScreen(
                     }
                 }
 
-                if (liveFirst) CalcioRow()
-
-                if (nuvio.available) {
+                @Composable
+                fun NuvioRow() {
+                    if (!nuvio.available) return
                     RowTitle("Continua a guardare", "Nuvio")
                     LazyRow(
                         state = nuvioListState,
@@ -249,9 +287,9 @@ fun HomeScreen(
                     }
                 }
 
-                if (!liveFirst) CalcioRow()
-
-                if (openTv.permitted && tvChannels.isNotEmpty()) {
+                @Composable
+                fun TvRow() {
+                    if (!openTv.permitted || tvChannels.isEmpty()) return
                     RowTitle("OpenTV", "Visti di recente e preferiti")
                     LazyRow(
                         state = tvListState,
@@ -268,46 +306,66 @@ fun HomeScreen(
                                     .onFocusChanged { if (it.isFocused) focused = Focused.Tv(channel) },
                             ) { onLaunch(viewModel.channelIntent(channel)) }
                         }
+                        // Few channels until the history fills up: a way into the full list.
+                        item(key = "__tv_all") {
+                            TextCard("Tutti i canali ›", Modifier.onFocusChanged { if (it.isFocused) focused = null }) {
+                                viewModel.openTvIntent()?.let(onLaunch)
+                            }
+                        }
                     }
                 }
 
-                RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare o nascondere")
-                LazyRow(
-                    state = appsListState,
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    modifier = Modifier.onPreviewKeyEvent { e ->
-                        val pkg = moving ?: return@onPreviewKeyEvent false
-                        when {
-                            e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft -> viewModel.move(pkg, -1)
-                            e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight -> viewModel.move(pkg, 1)
-                            // Same hold-OK guard as the menus: only a fresh press confirms.
-                            isOk(e.key) && e.type == KeyEventType.KeyDown &&
-                                e.nativeKeyEvent.repeatCount == 0 -> movingArmed = true
-                            isOk(e.key) && e.type == KeyEventType.KeyUp && movingArmed -> { moving = null; refocusApp(pkg) }
-                            e.key == Key.Back -> return@onPreviewKeyEvent false
-                        }
-                        true
-                    },
-                ) {
-                    items(apps.visible, key = { it.packageName }) { app ->
-                        AppCard(
-                            app = app,
-                            moving = moving == app.packageName,
-                            modifier = Modifier
-                                .focusRequester(requesterFor("app:${app.packageName}"))
-                                .onFocusChanged { if (it.isFocused) focused = Focused.App(app) },
-                            onClick = { onLaunch(viewModel.launchIntent(app)) },
-                            onLongClick = { menuFor = app },
-                        )
-                    }
-                    if (apps.hidden.isNotEmpty()) {
-                        item(key = "__hidden") {
-                            TextCard(
-                                "App nascoste (${apps.hidden.size})",
-                                modifier = Modifier.onFocusChanged { if (it.isFocused) focused = null },
-                                onClick = { overlay = Overlay.Hidden },
+                @Composable
+                fun AppsRow() {
+                    RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare o nascondere")
+                    LazyRow(
+                        state = appsListState,
+                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        modifier = Modifier.onPreviewKeyEvent { e ->
+                            val pkg = moving ?: return@onPreviewKeyEvent false
+                            when {
+                                e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft -> viewModel.move(pkg, -1)
+                                e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight -> viewModel.move(pkg, 1)
+                                // Same hold-OK guard as the menus: only a fresh press confirms.
+                                isOk(e.key) && e.type == KeyEventType.KeyDown &&
+                                    e.nativeKeyEvent.repeatCount == 0 -> movingArmed = true
+                                isOk(e.key) && e.type == KeyEventType.KeyUp && movingArmed -> { moving = null; refocusApp(pkg) }
+                                e.key == Key.Back -> return@onPreviewKeyEvent false
+                            }
+                            true
+                        },
+                    ) {
+                        items(apps.visible, key = { it.packageName }) { app ->
+                            AppCard(
+                                app = app,
+                                moving = moving == app.packageName,
+                                modifier = Modifier
+                                    .focusRequester(requesterFor("app:${app.packageName}"))
+                                    .onFocusChanged { if (it.isFocused) focused = Focused.App(app) },
+                                onClick = { onLaunch(viewModel.launchIntent(app)) },
+                                onLongClick = { menuFor = app },
                             )
+                        }
+                        if (apps.hidden.isNotEmpty()) {
+                            item(key = "__hidden") {
+                                TextCard(
+                                    "App nascoste (${apps.hidden.size})",
+                                    modifier = Modifier.onFocusChanged { if (it.isFocused) focused = null },
+                                    onClick = { overlay = Overlay.Hidden },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                rows.forEach { row ->
+                    key(row) {
+                        when (row) {
+                            HomeRow.NUVIO -> NuvioRow()
+                            HomeRow.CALCIO -> CalcioRow()
+                            HomeRow.OPENTV -> TvRow()
+                            HomeRow.APPS -> AppsRow()
                         }
                     }
                 }
@@ -327,7 +385,12 @@ fun HomeScreen(
             )
         }
 
-        val close = { overlay = Overlay.None; focusHome(); Unit }
+        // Focus goes back once the overlay has left the composition: while it is there its focus
+        // trap turns the request down and the focus lands on the gear.
+        val close = { overlay = Overlay.None; restoreFocus = true }
+        LaunchedEffect(overlay, restoreFocus) {
+            if (overlay == Overlay.None && restoreFocus) { restoreFocus = false; focusHome() }
+        }
         when (overlay) {
             Overlay.Settings -> OptionsOverlay(
                 title = "Impostazioni",
@@ -342,6 +405,8 @@ fun HomeScreen(
                             add("Collega account Nuvio" to { viewModel.startLogin(); overlay = Overlay.Login })
                         }
                     }
+                    add("Ordine righe" to { overlay = Overlay.Rows })
+                    add("Città meteo: ${city.name}" to { overlay = Overlay.City })
                     add("Impostazioni Fire TV" to { overlay = Overlay.None; onOpenSettings() })
                     add("Chiudi" to close)
                 },
@@ -374,6 +439,27 @@ fun HomeScreen(
                 } + ("Chiudi" to close),
                 onDismiss = close,
             )
+            Overlay.Rows -> {
+                var focusIndex by remember { mutableStateOf(0) }
+                OptionsOverlay(
+                    title = "Ordine righe · OK sposta su",
+                    options = rowOrder.mapIndexed { i, row ->
+                        "${i + 1}.  ${row.label}" to {
+                            viewModel.moveRowUp(row)
+                            focusIndex = if (i == 0) rowOrder.lastIndex else i - 1
+                        }
+                    } + ("Fatto" to close),
+                    onDismiss = close,
+                    focusIndex = focusIndex,
+                )
+            }
+            Overlay.City -> CityOverlay(
+                current = city,
+                results = citySearch,
+                onSearch = viewModel::searchCity,
+                onPick = { viewModel.setCity(it); close() },
+                onClose = close,
+            )
             Overlay.None -> Unit
         }
     }
@@ -389,16 +475,17 @@ private fun RowTitle(title: String, subtitle: String) {
 
 /** Backdrop of the focused title, top right, fading into the background on the left and bottom. */
 @Composable
-private fun Backdrop(url: String?) {
+private fun Backdrop(url: String?, glow: Color) {
     val context = LocalContext.current
     Crossfade(targetState = url, animationSpec = tween(400), label = "backdrop") { target ->
         if (target == null) {
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.radialGradient(listOf(Accent.copy(alpha = 0.22f), Color.Transparent), Offset(260f, 0f), 1100f),
+                    Brush.radialGradient(listOf(glow.copy(alpha = 0.26f), Color.Transparent), Offset(260f, 0f), 1100f),
                 ),
             )
         } else {
+            // The artwork is the colour here: a glow would show a seam where the image starts.
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
                 AsyncImage(
                     model = ImageRequest.Builder(context).data(target).size(1280, 720).crossfade(false).build(),
@@ -424,7 +511,17 @@ private fun Backdrop(url: String?) {
 @Composable
 private fun Hero(focused: Focused?, moving: Boolean, modifier: Modifier) {
     val context = LocalContext.current
-    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+    AnimatedContent(
+        targetState = focused,
+        contentKey = { it?.key },
+        transitionSpec = {
+            (fadeIn(tween(260)) + slideInHorizontally(tween(260)) { it / 24 }) togetherWith fadeOut(tween(140))
+        },
+        contentAlignment = Alignment.CenterStart,
+        modifier = modifier.fillMaxWidth(),
+        label = "hero",
+    ) { focused ->
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
         when (focused) {
             is Focused.App -> Column {
                 Text(focused.app.label, fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
@@ -453,6 +550,29 @@ private fun Hero(focused: Focused?, moving: Boolean, modifier: Modifier) {
             is Focused.Tv -> ChannelHero(focused.channel)
             null -> Unit
         }
+    }
+    }
+}
+
+/**
+ * Scrolls the App row so the tile at [index] keeps a whole neighbour on each side while it is
+ * being moved; without the margin the tile ends half under the left edge.
+ */
+private suspend fun LazyListState.keepWithNeighbours(index: Int) {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        animateScrollToItem((index - 1).coerceAtLeast(0))
+        return
+    }
+    val margin = item.size + info.mainAxisItemSpacing
+    val start = info.viewportStartOffset + info.beforeContentPadding
+    val end = info.viewportEndOffset - info.afterContentPadding
+    when {
+        item.offset - margin < start ->
+            animateScrollBy((item.offset - margin - start).toFloat())
+        item.offset + item.size + margin > end ->
+            animateScrollBy((item.offset + item.size + margin - end).toFloat())
     }
 }
 
@@ -537,3 +657,13 @@ private fun TextCard(label: String, modifier: Modifier, onClick: () -> Unit) {
         }
     }
 }
+
+/** Rows scrolled up fade out under the hero instead of ending in a hard cut. */
+private fun Modifier.fadeTop(enabled: Boolean): Modifier = if (!enabled) this else
+    graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
+        drawContent()
+        drawRect(
+            Brush.verticalGradient(0f to Color.Transparent, 28.dp.toPx() / size.height to Color.Black),
+            blendMode = BlendMode.DstIn,
+        )
+    }
