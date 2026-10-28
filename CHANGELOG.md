@@ -6,7 +6,7 @@
 - **Ordine righe**: dalle impostazioni si sceglie l'ordine di Continua a guardare, Calcio, OpenTV e App (una partita live porta comunque Calcio in cima).
 - **Città meteo**: dalle impostazioni si cerca la città (tastiera Fire); il nome compare sotto la temperatura.
 - **Riga OpenTV**: tessera "Tutti i canali ›" in fondo che apre OpenTV.
-- **Nuova icona e banner**.
+- **Nuova icona e banner**; il logo (tessere + scritta bicolore) sostituisce il titolo in alto a sinistra.
 - Spostando un'app la tessera non finisce più tagliata sul bordo sinistro.
 
 ## 0.3.0 — 28 ottobre 2026
