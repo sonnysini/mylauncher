@@ -2,10 +2,9 @@
 
 Launcher per Android TV / Fire TV, leggero e senza pubblicità, scritto in Kotlin con Jetpack Compose for TV.
 
-**Stato:** in sviluppo (0.1.0 = scheletro: header, meteo, orologio, riga app con riordino e app nascoste).
+**Stato:** in sviluppo — header con meteo e orologio, riga *Continua a guardare* da Nuvio, riga app con riordino e app nascoste.
 
 ## Roadmap
-- Riga *Continua a guardare* da Nuvio
 - Righe Calcio e canali da OpenTV
 - Hero dinamico e sfondo con i colori del contenuto a fuoco
 
@@ -18,6 +17,9 @@ La build gira su GitHub Actions (`.github/workflows/build.yml`); i tag `v*` pubb
 ```
 ./gradlew assembleDebug
 ```
+
+## Nuvio
+La riga *Continua a guardare* legge l'avanzamento dall'account [Nuvio](https://github.com/NuvioMedia/NuvioTV) (GPL-3.0) con lo stesso accesso a QR dell'app; i metadati arrivano da Cinemeta. URL e chiave pubblica del backend non sono nel repository: la build li legge dalle variabili `NUVIO_SUPABASE_URL` e `NUVIO_SUPABASE_ANON_KEY` (senza, la riga non compare).
 
 ## Licenza
 [GPL-3.0](LICENSE)

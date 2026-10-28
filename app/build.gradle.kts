@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+fun env(name: String): String = providers.environmentVariable(name).orNull.orEmpty()
+
 android {
     namespace = "app.mylauncher"
     compileSdk = 35
@@ -13,8 +15,15 @@ android {
         // Fire OS 6 (Fire TV Stick 4K) is Android 7.1.2.
         minSdk = 25
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+
+        // Nuvio account backend. Kept out of the public repo: CI reads them from secrets, local
+        // builds from the environment. Empty values just hide the Nuvio row.
+        buildConfigField("String", "NUVIO_SUPABASE_URL", "\"${env("NUVIO_SUPABASE_URL")}\"")
+        buildConfigField("String", "NUVIO_SUPABASE_ANON_KEY", "\"${env("NUVIO_SUPABASE_ANON_KEY")}\"")
+        // Italian titles and plots; without it the texts stay in English (Cinemeta).
+        buildConfigField("String", "TMDB_API_KEY", "\"${env("TMDB_API_KEY")}\"")
     }
 
     signingConfigs {
@@ -86,6 +95,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
 }

@@ -20,6 +20,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Nuvio backend config
+        run: |
+          echo "NUVIO_SUPABASE_URL=${{ secrets.NUVIO_SUPABASE_URL }}" >> "$GITHUB_ENV"
+          echo "NUVIO_SUPABASE_ANON_KEY=${{ secrets.NUVIO_SUPABASE_ANON_KEY }}" >> "$GITHUB_ENV"
+          echo "TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}" >> "$GITHUB_ENV"
+
       - name: Decode signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
