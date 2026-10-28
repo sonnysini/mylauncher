@@ -3,7 +3,7 @@ package app.mylauncher.ui
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusGroup
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusProperties
 
 /** Keeps D-pad focus inside an overlay: the home rows behind it stay focusable otherwise. */
