@@ -55,7 +55,8 @@ fun OptionsOverlay(
 ) {
     val first = remember { FocusRequester() }
     var armed by remember { mutableStateOf(false) }
-    LaunchedEffect(focusIndex, options.size) { runCatching { first.requestFocus() } }
+    // Keyed on the labels too: a list that reorders keeps the index but swaps what sits there.
+    LaunchedEffect(focusIndex, options.map { it.first }) { runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {

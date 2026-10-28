@@ -21,7 +21,7 @@ data class ContinueItem(
     val image: String?,
     val backdrop: String?,
     val logo: String?,
-    /** 0..1, null for an up-next episode not started yet. */
+    /** 0..1, null for an up-next episode or one barely started. */
     val progress: Float?,
     val minutesLeft: Int?,
 )
@@ -63,7 +63,7 @@ class NuvioRepository(context: Context) {
                 subtitle = meta?.year.orEmpty(),
                 description = italian?.overview ?: meta?.description.orEmpty(),
                 image = meta?.background ?: meta?.poster, backdrop = meta?.background, logo = meta?.logo,
-                progress = fraction, minutesLeft = minutesLeft(p),
+                progress = fraction.takeIf { it >= MIN_PROGRESS }, minutesLeft = minutesLeft(p),
             )
         }
 
@@ -85,7 +85,7 @@ class NuvioRepository(context: Context) {
                 ?: shown?.overview?.takeIf(String::isNotBlank)
                 ?: italian?.overview ?: meta?.description.orEmpty(),
             image = shown?.thumbnail ?: meta?.background, backdrop = meta?.background, logo = meta?.logo,
-            progress = if (finished) null else fraction,
+            progress = if (finished) null else fraction.takeIf { it >= MIN_PROGRESS },
             minutesLeft = if (finished) null else minutesLeft(p),
         )
     }
@@ -102,5 +102,7 @@ class NuvioRepository(context: Context) {
         const val NUVIO_PACKAGE = "com.nuvio.tv"
         private const val MAX_ITEMS = 15
         private const val FINISHED = 0.92f
+        /** Below this an episode was only just opened: an empty bar reads as broken. */
+        private const val MIN_PROGRESS = 0.02f
     }
 }

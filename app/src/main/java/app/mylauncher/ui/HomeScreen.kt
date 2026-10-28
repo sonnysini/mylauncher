@@ -47,7 +47,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -151,6 +155,7 @@ fun HomeScreen(
     var movingArmed by remember { mutableStateOf(false) }
     var initialFocusDone by remember { mutableStateOf(false) }
     var userMoved by remember { mutableStateOf(false) }
+    var restoreFocus by remember { mutableStateOf(false) }
 
     fun refocusApp(pkg: String?) {
         val target = pkg?.takeIf { p -> apps.visible.any { it.packageName == p } }
@@ -217,7 +222,7 @@ fun HomeScreen(
 
             Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(190.dp))
 
-            Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rowsScroll)) {
+            Column(Modifier.fillMaxWidth().weight(1f).fadeTop().verticalScroll(rowsScroll)) {
                 @Composable
                 fun CalcioRow() {
                     if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
@@ -380,7 +385,12 @@ fun HomeScreen(
             )
         }
 
-        val close = { overlay = Overlay.None; focusHome(); Unit }
+        // Focus goes back once the overlay has left the composition: while it is there its focus
+        // trap turns the request down and the focus lands on the gear.
+        val close = { overlay = Overlay.None; restoreFocus = true }
+        LaunchedEffect(overlay, restoreFocus) {
+            if (overlay == Overlay.None && restoreFocus) { restoreFocus = false; focusHome() }
+        }
         when (overlay) {
             Overlay.Settings -> OptionsOverlay(
                 title = "Impostazioni",
@@ -475,12 +485,8 @@ private fun Backdrop(url: String?, glow: Color) {
                 ),
             )
         } else {
+            // The artwork is the colour here: a glow would show a seam where the image starts.
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.radialGradient(listOf(glow.copy(alpha = 0.18f), Color.Transparent), Offset(260f, 0f), 1100f),
-                    ),
-                )
                 AsyncImage(
                     model = ImageRequest.Builder(context).data(target).size(1280, 720).crossfade(false).build(),
                     contentDescription = null,
@@ -651,3 +657,13 @@ private fun TextCard(label: String, modifier: Modifier, onClick: () -> Unit) {
         }
     }
 }
+
+/** Rows scrolled up fade out under the hero instead of ending in a hard cut. */
+private fun Modifier.fadeTop(): Modifier =
+    graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
+        drawContent()
+        drawRect(
+            Brush.verticalGradient(0f to Color.Transparent, 28.dp.toPx() / size.height to Color.Black),
+            blendMode = BlendMode.DstIn,
+        )
+    }

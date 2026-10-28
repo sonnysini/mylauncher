@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -52,10 +53,16 @@ fun CityOverlay(
     onClose: () -> Unit,
 ) {
     val field = remember { FocusRequester() }
+    val firstResult = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     var query by remember { mutableStateOf("") }
     var searched by remember { mutableStateOf(false) }
     var fieldFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
+    // The Fire keyboard is full screen: once the matches are in, it goes and the first one takes focus.
+    LaunchedEffect(results) {
+        if (searched && !results.isNullOrEmpty()) runCatching { firstResult.requestFocus() }
+    }
     BackHandler(onBack = onClose)
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {
@@ -77,7 +84,7 @@ fun CityOverlay(
                 textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
                 cursorBrush = SolidColor(Color.White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { searched = true; onSearch(query) }),
+                keyboardActions = KeyboardActions(onSearch = { searched = true; keyboard?.hide(); onSearch(query) }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(field)
@@ -99,21 +106,21 @@ fun CityOverlay(
                 else -> LazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(results.size) { i ->
                         val (city, where) = results[i]
-                        Choice("${city.name}  ·  $where") { onPick(city) }
+                        Choice("${city.name}  ·  $where", if (i == 0) Modifier.focusRequester(firstResult) else Modifier) { onPick(city) }
                     }
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Choice("Chiudi", onClose)
+            Choice("Chiudi", Modifier, onClose)
         }
     }
 }
 
 @Composable
-private fun Choice(label: String, onClick: () -> Unit) {
+private fun Choice(label: String, modifier: Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
