@@ -222,7 +222,7 @@ fun HomeScreen(
 
             Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(190.dp))
 
-            Column(Modifier.fillMaxWidth().weight(1f).fadeTop().verticalScroll(rowsScroll)) {
+            Column(Modifier.fillMaxWidth().weight(1f).fadeTop(rowsScroll.value > 0).verticalScroll(rowsScroll)) {
                 @Composable
                 fun CalcioRow() {
                     if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
@@ -659,7 +659,7 @@ private fun TextCard(label: String, modifier: Modifier, onClick: () -> Unit) {
 }
 
 /** Rows scrolled up fade out under the hero instead of ending in a hard cut. */
-private fun Modifier.fadeTop(): Modifier =
+private fun Modifier.fadeTop(enabled: Boolean): Modifier = if (!enabled) this else
     graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
         drawContent()
         drawRect(
