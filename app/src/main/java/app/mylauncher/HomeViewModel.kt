@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.mylauncher.data.AppEntry
 import app.mylauncher.data.AppRepository
+import app.mylauncher.data.City
+import app.mylauncher.data.HomeRow
 import app.mylauncher.data.Prefs
 import app.mylauncher.data.Weather
 import app.mylauncher.data.WeatherRepository
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -82,6 +85,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _weather = MutableStateFlow<Weather?>(null)
     val weather: StateFlow<Weather?> = _weather.asStateFlow()
+    val city: StateFlow<City> = prefs.city.stateIn(viewModelScope, SharingStarted.Eagerly, City.DEFAULT)
+
+    val rows: StateFlow<List<HomeRow>> = prefs.rows.stateIn(viewModelScope, SharingStarted.Eagerly, HomeRow.entries)
+
+    private val _citySearch = MutableStateFlow<List<Pair<City, String>>?>(null)
+    /** Results of the last city search; null while none was run (or one is running). */
+    val citySearch: StateFlow<List<Pair<City, String>>?> = _citySearch.asStateFlow()
 
     private val _nuvio = MutableStateFlow(NuvioState(available = nuvio.api.configured))
     val nuvioState: StateFlow<NuvioState> = _nuvio.asStateFlow()
@@ -105,9 +115,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            while (true) {
-                weatherRepo.current()?.let { _weather.value = it }
-                delay(if (_weather.value == null) 60_000L else 30 * 60_000L)
+            prefs.city.collectLatest { city ->
+                if (_weather.value?.city != city.name) _weather.value = null
+                while (true) {
+                    weatherRepo.current(city)?.let { _weather.value = it }
+                    delay(if (_weather.value == null) 60_000L else 30 * 60_000L)
+                }
             }
         }
     }
@@ -145,6 +158,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun channelIntent(channel: TvChannel) = openTv.channelIntent(channel)
     fun matchIntent(match: Match) = openTv.matchIntent(match)
     fun footballIntent() = openTv.footballIntent()
+    fun openTvIntent() = openTv.openIntent()
 
     fun startLogin() {
         loginJob?.cancel()
@@ -207,6 +221,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (from < 0 || to !in visible.indices) return
         visible.add(to, visible.removeAt(from))
         viewModelScope.launch { prefs.setOrder(visible + state.hidden.map { it.packageName }) }
+    }
+
+    /** Moves [row] one place up (wrapping the first one to the bottom). */
+    fun moveRowUp(row: HomeRow) {
+        val list = rows.value.toMutableList()
+        val from = list.indexOf(row)
+        if (from < 0) return
+        list.removeAt(from)
+        list.add(if (from == 0) list.size else from - 1, row)
+        viewModelScope.launch { prefs.setRows(list) }
+    }
+
+    fun searchCity(query: String) {
+        if (query.isBlank()) return
+        _citySearch.value = null
+        viewModelScope.launch { _citySearch.value = weatherRepo.search(query) }
+    }
+
+    fun setCity(city: City) {
+        viewModelScope.launch { prefs.setCity(city) }
+        _citySearch.value = null
     }
 
     private companion object {

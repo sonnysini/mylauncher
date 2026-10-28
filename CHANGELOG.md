@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 28 ottobre 2026
+- **Sfondo dinamico**: il bagliore dietro la home prende il colore della tessera a fuoco (locandina, stemma, logo del canale o banner dell'app) e sfuma da un colore all'altro.
+- **Hero animato**: al cambio di tessera i dettagli entrano con una dissolvenza e un leggero scorrimento.
+- **Ordine righe**: dalle impostazioni si sceglie l'ordine di Continua a guardare, Calcio, OpenTV e App (una partita live porta comunque Calcio in cima).
+- **Città meteo**: dalle impostazioni si cerca la città (tastiera Fire); il nome compare sotto la temperatura.
+- **Riga OpenTV**: tessera "Tutti i canali ›" in fondo che apre OpenTV.
+- **Nuova icona e banner**.
+- Spostando un'app la tessera non finisce più tagliata sul bordo sinistro.
+
 ## 0.3.0 — 28 ottobre 2026
 - **Riga Calcio (da OpenTV)**: partite di Serie A live (risultato e minuto), di oggi, finite (▶ highlights) e prossime. Con una partita in diretta la riga sale in cima e prende il focus. OK su una live/prossima = "Guarda in automatico" in OpenTV, su una finita = highlights; "Tutte ›" apre la scheda Calcio.
 - **Riga OpenTV**: canali visti di recente e preferiti con il programma in onda e la barra di avanzamento. OK apre il canale.

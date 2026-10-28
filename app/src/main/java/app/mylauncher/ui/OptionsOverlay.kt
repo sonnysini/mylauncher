@@ -46,10 +46,16 @@ import androidx.tv.material3.Text
  * OK until a fresh press starts.
  */
 @Composable
-fun OptionsOverlay(title: String, options: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
+fun OptionsOverlay(
+    title: String,
+    options: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit,
+    /** Option that takes the focus; changing it moves the focus (lists that reorder themselves). */
+    focusIndex: Int = 0,
+) {
     val first = remember { FocusRequester() }
     var armed by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    LaunchedEffect(focusIndex, options.size) { runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {
@@ -77,7 +83,7 @@ fun OptionsOverlay(title: String, options: List<Pair<String, () -> Unit>>, onDis
                     val (label, action) = options[i]
                     Surface(
                         onClick = action,
-                        modifier = Modifier.fillMaxWidth().let { if (i == 0) it.focusRequester(first) else it },
+                        modifier = Modifier.fillMaxWidth().let { if (i == focusIndex.coerceIn(options.indices)) it.focusRequester(first) else it },
                         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.Transparent,

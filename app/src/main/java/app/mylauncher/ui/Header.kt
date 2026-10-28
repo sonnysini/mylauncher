@@ -39,7 +39,10 @@ fun Header(weather: Weather?, onOpenSettings: () -> Unit, modifier: Modifier = M
         Text("My Launcher", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Spacer(Modifier.weight(1f))
         if (weather != null) {
-            Text("${weather.symbol}  ${weather.temperature}°", fontSize = 20.sp, color = Color.White)
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${weather.symbol}  ${weather.temperature}°", fontSize = 20.sp, color = Color.White)
+                Text(weather.city, fontSize = 12.sp, color = Muted, maxLines = 1)
+            }
             Spacer(Modifier.width(28.dp))
         }
         Clock()
