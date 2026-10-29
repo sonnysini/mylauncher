@@ -3,21 +3,28 @@ package app.mylauncher.data
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** A launchable app. [banner] is the 16:9 TV banner when the app ships one, else null. */
+/**
+ * A launchable app. [banner] is the 16:9 TV banner when the app ships one, else null. [system]
+ * apps came with Fire OS and cannot be uninstalled.
+ */
 data class AppEntry(
     val packageName: String,
     val label: String,
     val component: ComponentName,
     val leanback: Boolean,
+    val system: Boolean,
     val banner: ImageBitmap?,
     val icon: ImageBitmap,
 )
@@ -47,6 +54,19 @@ class AppRepository(private val context: Context) {
             .setComponent(app.component)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
 
+    /** System confirmation dialog for removing [app]. */
+    fun uninstallIntent(app: AppEntry): Intent =
+        Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
+     * The app's page in the Fire settings, with Force stop and Clear cache: a launcher cannot do
+     * either itself, both need permissions Fire OS keeps for system apps.
+     */
+    fun detailsIntent(app: AppEntry): Intent =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     private fun query(category: String): List<ResolveInfo> =
         pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(category), 0)
 
@@ -62,6 +82,7 @@ class AppRepository(private val context: Context) {
             label = info.loadLabel(pm).toString(),
             component = ComponentName(ai.packageName, ai.name),
             leanback = isTv,
+            system = ai.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0,
             banner = banner,
             icon = icon,
         )

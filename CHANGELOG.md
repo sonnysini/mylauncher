@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 29 ottobre 2026
+- **Disinstalla** dal menu "tieni premuto OK" su un'app (conferma di sistema; non compare per le app di Fire OS).
+- **Forza arresto · Svuota cache**: dallo stesso menu apre la pagina dell'app nelle impostazioni Fire, dove ci sono entrambi (un launcher non può farli da sé).
+- **Impostazioni Fire TV** dall'ingranaggio si aprono di nuovo: il rimando del tasto Home le scambiava per la Home Amazon.
+- Scegliendo **Sposta** il focus resta sull'app da spostare invece di saltare sulla prima riga; lo stesso dopo Nascondi, Annulla e Disinstalla.
+
 ## 0.4.0 — 28 ottobre 2026
 - **Sfondo dinamico**: il bagliore dietro la home prende il colore della tessera a fuoco (locandina, stemma, logo del canale o banner dell'app) e sfuma da un colore all'altro.
 - **Hero animato**: al cambio di tessera i dettagli entrano con una dissolvenza e un leggero scorrimento.

@@ -211,6 +211,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun launchIntent(app: AppEntry) = repo.launchIntent(app)
+    fun uninstallIntent(app: AppEntry) = repo.uninstallIntent(app)
+    fun detailsIntent(app: AppEntry) = repo.detailsIntent(app)
 
     /** Moves [packageName] by [delta] places among the visible apps. */
     fun move(packageName: String, delta: Int) {

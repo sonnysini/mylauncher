@@ -156,6 +156,10 @@ fun HomeScreen(
     var initialFocusDone by remember { mutableStateOf(false) }
     var userMoved by remember { mutableStateOf(false) }
     var restoreFocus by remember { mutableStateOf(false) }
+    /** App tile to focus once the app menu has left the composition ("" = first app). */
+    var focusAfterMenu by remember { mutableStateOf<String?>(null) }
+    /** Where the focused app sat, so an uninstalled app hands the focus to its neighbour. */
+    var lastAppIndex by remember { mutableStateOf(0) }
 
     fun refocusApp(pkg: String?) {
         val target = pkg?.takeIf { p -> apps.visible.any { it.packageName == p } }
@@ -197,6 +201,20 @@ fun HomeScreen(
             viewModel.refreshOpenTv()
             focusHome()
             userMoved = false
+        }
+    }
+    // While the menu is there its focus trap turns the request down, and the focus ends on the
+    // first row once it goes: ask again after it has left.
+    LaunchedEffect(menuFor, focusAfterMenu) {
+        val pkg = focusAfterMenu ?: return@LaunchedEffect
+        if (menuFor != null) return@LaunchedEffect
+        focusAfterMenu = null
+        refocusApp(pkg.ifEmpty { null })
+    }
+    LaunchedEffect(apps.visible) {
+        val app = (focused as? Focused.App)?.app ?: return@LaunchedEffect
+        if (menuFor == null && apps.visible.none { it.packageName == app.packageName }) {
+            refocusApp(apps.visible.getOrNull(lastAppIndex.coerceAtMost(apps.visible.lastIndex))?.packageName)
         }
     }
     LaunchedEffect(apps.visible, moving) {
@@ -317,7 +335,7 @@ fun HomeScreen(
 
                 @Composable
                 fun AppsRow() {
-                    RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare o nascondere")
+                    RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare, nascondere o disinstallare")
                     LazyRow(
                         state = appsListState,
                         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
@@ -342,7 +360,12 @@ fun HomeScreen(
                                 moving = moving == app.packageName,
                                 modifier = Modifier
                                     .focusRequester(requesterFor("app:${app.packageName}"))
-                                    .onFocusChanged { if (it.isFocused) focused = Focused.App(app) },
+                                    .onFocusChanged {
+                                        if (it.isFocused) {
+                                            focused = Focused.App(app)
+                                            lastAppIndex = apps.visible.indexOf(app).coerceAtLeast(0)
+                                        }
+                                    },
                                 onClick = { onLaunch(viewModel.launchIntent(app)) },
                                 onLongClick = { menuFor = app },
                             )
@@ -376,12 +399,16 @@ fun HomeScreen(
         menuFor?.let { app ->
             OptionsOverlay(
                 title = app.label,
-                options = listOf(
-                    "Sposta" to { menuFor = null; movingArmed = false; moving = app.packageName; refocusApp(app.packageName) },
-                    "Nascondi" to { menuFor = null; viewModel.setHidden(app.packageName, true); refocusApp(null) },
-                    "Annulla" to { menuFor = null; refocusApp(app.packageName) },
-                ),
-                onDismiss = { menuFor = null; refocusApp(app.packageName) },
+                options = buildList<Pair<String, () -> Unit>> {
+                    add("Sposta" to { menuFor = null; movingArmed = false; moving = app.packageName; focusAfterMenu = app.packageName })
+                    add("Nascondi" to { menuFor = null; viewModel.setHidden(app.packageName, true); focusAfterMenu = "" })
+                    if (!app.system) {
+                        add("Disinstalla" to { menuFor = null; focusAfterMenu = app.packageName; onLaunch(viewModel.uninstallIntent(app)) })
+                    }
+                    add("Forza arresto · Svuota cache" to { menuFor = null; focusAfterMenu = app.packageName; onLaunch(viewModel.detailsIntent(app)) })
+                    add("Annulla" to { menuFor = null; focusAfterMenu = app.packageName })
+                },
+                onDismiss = { menuFor = null; focusAfterMenu = app.packageName },
             )
         }
 
