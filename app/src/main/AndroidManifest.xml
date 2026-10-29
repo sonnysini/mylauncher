@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- "Disinstalla" in the app menu: opens the system confirmation, the user still decides. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- OpenTV's launcher rows: a signature permission, granted because both apps share a key. -->
     <uses-permission android:name="app.opentv.sonny.permission.LAUNCHER" />
 
