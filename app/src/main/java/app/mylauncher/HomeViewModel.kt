@@ -8,6 +8,7 @@ import app.mylauncher.data.AppRepository
 import app.mylauncher.data.City
 import app.mylauncher.data.HomeRow
 import app.mylauncher.data.Prefs
+import app.mylauncher.data.Updater
 import app.mylauncher.data.Weather
 import app.mylauncher.data.WeatherRepository
 import app.mylauncher.data.nuvio.ContinueItem
@@ -58,6 +59,15 @@ data class OpenTvState(
     val anyLive: Boolean get() = data.matches.any { it.phase == MatchPhase.LIVE }
 }
 
+sealed interface UpdateState {
+    data object None : UpdateState
+    data object Checking : UpdateState
+    data object UpToDate : UpdateState
+    data class Available(val update: Updater.Update) : UpdateState
+    data class Downloading(val update: Updater.Update, val fraction: Float) : UpdateState
+    data class Failed(val update: Updater.Update) : UpdateState
+}
+
 data class AppsState(val visible: List<AppEntry> = emptyList(), val hidden: List<AppEntry> = emptyList())
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -106,6 +116,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var lastNuvioRefresh = 0L
 
+    private val updater = Updater(app, BuildConfig.VERSION_NAME)
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.None)
+    val update: StateFlow<UpdateState> = _update.asStateFlow()
+    private var lastUpdateCheck = 0L
+    /** Version the user said "Più tardi" to: not offered again until the next one. */
+    private var skippedVersion: String? = null
+
     init {
         reloadApps()
         viewModelScope.launch {
@@ -123,6 +140,44 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    /**
+     * Automatic check on every return home, at most every few hours; [manual] (from the settings)
+     * always goes to GitHub and also reports "up to date".
+     */
+    fun checkUpdate(manual: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (!manual && (_update.value != UpdateState.None || (lastUpdateCheck != 0L && now - lastUpdateCheck < UPDATE_INTERVAL_MS))) return
+        lastUpdateCheck = now
+        if (manual) _update.value = UpdateState.Checking
+        viewModelScope.launch {
+            val found = updater.check()
+            _update.value = when {
+                found != null && (manual || found.version != skippedVersion) -> UpdateState.Available(found)
+                manual -> UpdateState.UpToDate
+                else -> _update.value
+            }
+        }
+    }
+
+    fun installUpdate() {
+        val update = when (val s = _update.value) {
+            is UpdateState.Available -> s.update
+            is UpdateState.Failed -> s.update
+            else -> return
+        }
+        viewModelScope.launch {
+            _update.value = UpdateState.Downloading(update, 0f)
+            runCatching { updater.install(update) { f -> _update.value = UpdateState.Downloading(update, f) } }
+                .onSuccess { _update.value = UpdateState.None }
+                .onFailure { _update.value = UpdateState.Failed(update) }
+        }
+    }
+
+    fun dismissUpdate() {
+        (_update.value as? UpdateState.Available)?.let { skippedVersion = it.update.version }
+        _update.value = UpdateState.None
     }
 
     /** Called on every return to the home screen; throttled so app switching stays cheap. */
@@ -248,6 +303,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val NUVIO_MIN_INTERVAL_MS = 60_000L
+        const val UPDATE_INTERVAL_MS = 6 * 60 * 60_000L
     }
 
     fun setHidden(packageName: String, hidden: Boolean) {
