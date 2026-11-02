@@ -52,6 +52,8 @@ fun OptionsOverlay(
     onDismiss: () -> Unit,
     /** Option that takes the focus; changing it moves the focus (lists that reorder themselves). */
     focusIndex: Int = 0,
+    /** Text under the title (release notes and the like). */
+    message: String? = null,
 ) {
     val first = remember { FocusRequester() }
     var armed by remember { mutableStateOf(false) }
@@ -78,6 +80,10 @@ fun OptionsOverlay(
                 .padding(18.dp),
         ) {
             Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+            if (!message.isNullOrBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(message, fontSize = 14.sp, color = Color.White.copy(alpha = 0.75f), maxLines = 10)
+            }
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(options.size) { i ->

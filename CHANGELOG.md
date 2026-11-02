@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 — 2 novembre 2026
+- **Aggiornamenti automatici**: quando esce una nuova versione compare un popup sulla home con le novità; "Aggiorna ora" la scarica e apre l'installazione di sistema. "Più tardi" non la ripropone fino alla versione successiva.
+- **Cerca aggiornamenti** nelle impostazioni (ingranaggio), con la versione installata.
+
 ## 0.6.0 — 2 novembre 2026
 - **Calcio senza risultati**: tessere e hero non mostrano più il punteggio (prima, con OpenTV 0.38+, compariva un finto "0 – 0" su live e finite). Restano orario, "● LIVE" e "Finale · ▶ Highlights"; nell'hero sempre "Casa vs Ospite".
 

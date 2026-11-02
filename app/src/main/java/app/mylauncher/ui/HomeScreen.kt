@@ -71,8 +71,10 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Text
+import app.mylauncher.BuildConfig
 import app.mylauncher.HomeViewModel
 import app.mylauncher.LoginState
+import app.mylauncher.UpdateState
 import app.mylauncher.data.AppEntry
 import app.mylauncher.data.HomeRow
 import app.mylauncher.data.nuvio.ContinueItem
@@ -132,6 +134,7 @@ fun HomeScreen(
     val rowOrder by viewModel.rows.collectAsStateWithLifecycle()
     val city by viewModel.city.collectAsStateWithLifecycle()
     val citySearch by viewModel.citySearch.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
     val matches = openTv.data.matches
     val tvChannels = openTv.data.channels
     // A match on now: Calcio goes to the top and takes the first focus.
@@ -434,6 +437,7 @@ fun HomeScreen(
                     }
                     add("Ordine righe" to { overlay = Overlay.Rows })
                     add("Città meteo: ${city.name}" to { overlay = Overlay.City })
+                    add("Cerca aggiornamenti · v${BuildConfig.VERSION_NAME}" to { overlay = Overlay.None; viewModel.checkUpdate(manual = true) })
                     add("Impostazioni Fire TV" to { overlay = Overlay.None; onOpenSettings() })
                     add("Chiudi" to close)
                 },
@@ -488,6 +492,41 @@ fun HomeScreen(
                 onClose = close,
             )
             Overlay.None -> Unit
+        }
+
+        // Update popup: waits for the other menus to close rather than stacking on them.
+        if (overlay == Overlay.None && menuFor == null) {
+            val closeUpdate = { viewModel.dismissUpdate(); restoreFocus = true }
+            when (val u = update) {
+                is UpdateState.Available -> OptionsOverlay(
+                    title = "My Launcher ${u.update.version} disponibile",
+                    message = "Ora hai la ${BuildConfig.VERSION_NAME}.\n\n${u.update.notes}".trim(),
+                    options = listOf("Aggiorna ora" to viewModel::installUpdate, "Più tardi" to closeUpdate),
+                    onDismiss = closeUpdate,
+                )
+                is UpdateState.Downloading -> OptionsOverlay(
+                    title = "Scarico la ${u.update.version}… ${(u.fraction * 100).toInt()}%",
+                    options = listOf("Attendi…" to {}),
+                    onDismiss = {},
+                )
+                is UpdateState.Failed -> OptionsOverlay(
+                    title = "Download non riuscito",
+                    options = listOf("Riprova" to viewModel::installUpdate, "Chiudi" to closeUpdate),
+                    onDismiss = closeUpdate,
+                )
+                UpdateState.Checking -> OptionsOverlay(
+                    title = "Cerco aggiornamenti…",
+                    options = listOf("Chiudi" to closeUpdate),
+                    onDismiss = closeUpdate,
+                )
+                UpdateState.UpToDate -> OptionsOverlay(
+                    title = "Nessun aggiornamento",
+                    message = "My Launcher ${BuildConfig.VERSION_NAME} è l'ultima versione.",
+                    options = listOf("OK" to closeUpdate),
+                    onDismiss = closeUpdate,
+                )
+                UpdateState.None -> Unit
+            }
         }
     }
 }

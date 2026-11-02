@@ -62,6 +62,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // New launcher release on GitHub: popup over the home (throttled inside the view model).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    viewModel.checkUpdate()
+                    delay(60 * 60_000L)
+                }
+            }
+        }
         setContent {
             LauncherTheme {
                 HomeScreen(
