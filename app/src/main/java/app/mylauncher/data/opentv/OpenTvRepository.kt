@@ -41,10 +41,8 @@ data class Match(
     val round: String?,
     val home: String,
     val homeCrest: String,
-    val homeScore: Int?,
     val away: String,
     val awayCrest: String,
-    val awayScore: Int?,
     val channels: List<String>,
     val highlights: String?,
 )
@@ -101,10 +99,8 @@ class OpenTvRepository(private val context: Context) {
                 round = c.string("round"),
                 home = c.string("home").orEmpty(),
                 homeCrest = c.string("home_crest").orEmpty(),
-                homeScore = c.long("home_score")?.toInt(),
                 away = c.string("away").orEmpty(),
                 awayCrest = c.string("away_crest").orEmpty(),
-                awayScore = c.long("away_score")?.toInt(),
                 channels = c.string("channels").orEmpty().split('|').filter { it.isNotBlank() },
                 highlights = c.string("highlights"),
             )
