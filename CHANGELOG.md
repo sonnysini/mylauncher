@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.0 — 2 novembre 2026
+- **Calcio senza risultati**: tessere e hero non mostrano più il punteggio (prima, con OpenTV 0.38+, compariva un finto "0 – 0" su live e finite). Restano orario, "● LIVE" e "Finale · ▶ Highlights"; nell'hero sempre "Casa vs Ospite".
+
 ## 0.5.0 — 29 ottobre 2026
 - **Disinstalla** dal menu "tieni premuto OK" su un'app (conferma di sistema; non compare per le app di Fire OS).
 - **Forza arresto · Svuota cache**: dallo stesso menu apre la pagina dell'app nelle impostazioni Fire, dove ci sono entrambi (un launcher non può farli da sé).

@@ -71,9 +71,6 @@ fun Match.statusLabel(): String = when (phase) {
     MatchPhase.SCHEDULED -> kickoffLabel(kickoff)
 }
 
-fun Match.scoreLabel(): String? =
-    if (phase == MatchPhase.LIVE || phase == MatchPhase.FINISHED) "${homeScore ?: 0} – ${awayScore ?: 0}" else null
-
 fun Match.actionLabel(): String = when {
     phase == MatchPhase.FINISHED && highlights != null -> "OK ▶ Highlights"
     phase == MatchPhase.LIVE && channels.isNotEmpty() -> "OK ▶ Guarda ora"
@@ -115,8 +112,9 @@ fun MatchCard(match: Match, modifier: Modifier, onClick: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Crest(match.homeCrest, 40.dp)
                     Text(
-                        match.scoreLabel() ?: hour(match.kickoff),
-                        fontSize = if (match.scoreLabel() != null) 22.sp else 18.sp,
+                        // No score: a game is watched later too (OpenTV no longer sends it).
+                        hour(match.kickoff),
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                     )
@@ -185,7 +183,7 @@ fun MatchHero(match: Match) {
             Spacer(Modifier.width(14.dp))
             Text(match.home, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
             Spacer(Modifier.width(18.dp))
-            Text(match.scoreLabel() ?: "vs", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("vs", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Spacer(Modifier.width(18.dp))
             Text(match.away, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
             Spacer(Modifier.width(14.dp))
