@@ -247,7 +247,7 @@ fun HomeScreen(
                 @Composable
                 fun CalcioRow() {
                     if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
-                    RowTitle("Calcio", if (liveFirst) "Serie A · in diretta ora" else "Serie A · da OpenTV")
+                    RowTitle("Calcio", if (liveFirst) "Serie A · in diretta ora" else "Serie A · da MyTV")
                     LazyRow(
                         state = calcioListState,
                         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
@@ -311,7 +311,7 @@ fun HomeScreen(
                 @Composable
                 fun TvRow() {
                     if (!openTv.permitted || tvChannels.isEmpty()) return
-                    RowTitle("OpenTV", "Visti di recente e preferiti")
+                    RowTitle("MyTV", "Visti di recente e preferiti")
                     LazyRow(
                         state = tvListState,
                         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
