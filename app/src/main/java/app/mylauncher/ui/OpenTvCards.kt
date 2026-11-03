@@ -75,7 +75,7 @@ fun Match.actionLabel(): String = when {
     phase == MatchPhase.FINISHED && highlights != null -> "OK ▶ Highlights"
     phase == MatchPhase.LIVE && channels.isNotEmpty() -> "OK ▶ Guarda ora"
     phase == MatchPhase.SCHEDULED && channels.isNotEmpty() -> "OK ▶ Guarda in automatico"
-    else -> "OK per aprire Calcio in OpenTV"
+    else -> "OK per aprire Calcio in MyTV"
 }
 
 @Composable

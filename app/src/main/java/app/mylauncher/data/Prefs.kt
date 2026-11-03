@@ -17,7 +17,7 @@ data class AppLayout(val order: List<String> = emptyList(), val hidden: Set<Stri
 enum class HomeRow(val label: String) {
     NUVIO("Continua a guardare"),
     CALCIO("Calcio"),
-    OPENTV("OpenTV"),
+    OPENTV("MyTV"),
     APPS("App"),
 }
 

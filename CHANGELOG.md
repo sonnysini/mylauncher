@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.7.1 — 3 novembre 2026
+- **OpenTV ora si chiama MyTV**: la riga canali e la riga Calcio usano il nome nuovo. Nessun cambio di collegamento: l'app è la stessa.
+
 ## 0.7.0 — 2 novembre 2026
 - **Aggiornamenti automatici**: quando esce una nuova versione compare un popup sulla home con le novità; "Aggiorna ora" la scarica e apre l'installazione di sistema. "Più tardi" non la ripropone fino alla versione successiva.
 - **Cerca aggiornamenti** nelle impostazioni (ingranaggio), con la versione installata.
