@@ -1,7 +1,6 @@
 # Changelog
 
 ## 0.9.0 — 9 novembre 2026
-- **Tasti telecomando** nelle impostazioni (ingranaggio): scegli un tasto e cosa deve fare, in qualsiasi app — aprire un'app (es. tasto TV → MyTV) oppure alzare/abbassare il volume software del 5%, con una barra del volume sopra l'app in uso. I tasti senza regola fanno quello di sempre; frecce, OK, Home, Indietro, ☰ e Alexa non si toccano. Il servizio va abilitato una volta via ADB.
 - **Volume più ripido**: circa 1,2 dB ogni 5% (70% ≈ −7 dB, 5% ≈ −23 dB) e 0% = muto; prima il fondo scala era −15 dB.
 
 ## 0.8.0 — 9 novembre 2026

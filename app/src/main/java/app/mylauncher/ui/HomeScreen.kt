@@ -72,10 +72,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Text
 import app.mylauncher.BuildConfig
-import app.mylauncher.keys.KeyAction
-import app.mylauncher.keys.KeyRules
 import app.mylauncher.volume.Volume
-import app.mylauncher.AppsState
 import app.mylauncher.HomeViewModel
 import app.mylauncher.LoginState
 import app.mylauncher.UpdateState
@@ -119,7 +116,7 @@ private val Focused.colorSource: Any?
         is Focused.Tv -> channel.logo
     }
 
-private enum class Overlay { None, Settings, Profiles, Login, Hidden, Rows, City, Volume, Keys, KeyMenu, KeyCapture, KeyAction, KeyApp }
+private enum class Overlay { None, Settings, Profiles, Login, Hidden, Rows, City, Volume }
 
 @Composable
 fun HomeScreen(
@@ -134,8 +131,6 @@ fun HomeScreen(
     val login by viewModel.login.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val volume by remember { Volume.percent(context) }.collectAsStateWithLifecycle()
-    val keyRules by remember { KeyRules.rules(context) }.collectAsStateWithLifecycle()
-    val keyServiceRunning by KeyRules.running.collectAsStateWithLifecycle()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val profileId by viewModel.profileId.collectAsStateWithLifecycle()
     val openTv by viewModel.openTvState.collectAsStateWithLifecycle()
@@ -425,9 +420,6 @@ fun HomeScreen(
 
         // Back from Volume lands on the Volume entry, not on the first line.
         var settingsFocus by remember { mutableStateOf(0) }
-        /** Key being added or edited in Tasti telecomando, and the line to focus in its list. */
-        var keyCode by remember { mutableStateOf<Int?>(null) }
-        var keysFocus by remember { mutableStateOf(0) }
         // Focus goes back once the overlay has left the composition: while it is there its focus
         // trap turns the request down and the focus lands on the gear.
         val close = { overlay = Overlay.None; restoreFocus = true; settingsFocus = 0 }
@@ -451,8 +443,6 @@ fun HomeScreen(
                     }
                     val volumeIndex = size
                     add("Volume: ${volume ?: 100}%" to { settingsFocus = volumeIndex; overlay = Overlay.Volume })
-                    val keysIndex = size
-                    add("Tasti telecomando" to { settingsFocus = keysIndex; overlay = Overlay.Keys })
                     add("Ordine righe" to { overlay = Overlay.Rows })
                     add("Città meteo: ${city.name}" to { overlay = Overlay.City })
                     add("Cerca aggiornamenti · v${BuildConfig.VERSION_NAME}" to { overlay = Overlay.None; viewModel.checkUpdate(manual = true) })
@@ -514,83 +504,6 @@ fun HomeScreen(
                 onChange = { Volume.set(context, it) },
                 onDismiss = { overlay = Overlay.Settings },
             )
-            Overlay.Keys -> {
-                val rules = keyRules.orEmpty().entries.toList()
-                val active = keyServiceRunning || KeyRules.enabledInSettings(context)
-                OptionsOverlay(
-                    title = "Tasti telecomando",
-                    message = if (active) {
-                        if (rules.isEmpty()) "Nessun tasto personalizzato." else "OK su una regola per cambiarla o toglierla."
-                    } else {
-                        "Servizio non attivo: va abilitato una volta via ADB (accessibilità). Le regole restano salvate."
-                    },
-                    focusIndex = keysFocus,
-                    options = rules.mapIndexed { i, (code, action) ->
-                        "${KeyRules.keyName(code)}  →  ${actionLabel(action, apps)}" to {
-                            keysFocus = i; keyCode = code; overlay = Overlay.KeyMenu
-                        }
-                    } + listOf(
-                        "＋ Aggiungi tasto" to { keysFocus = rules.size; overlay = Overlay.KeyCapture },
-                        "Chiudi" to { keysFocus = 0; overlay = Overlay.Settings },
-                    ),
-                    onDismiss = { keysFocus = 0; overlay = Overlay.Settings },
-                )
-            }
-            Overlay.KeyMenu -> {
-                val code = keyCode
-                val action = code?.let { keyRules?.get(it) }
-                if (code == null || action == null) {
-                    LaunchedEffect(Unit) { overlay = Overlay.Keys }
-                } else {
-                    OptionsOverlay(
-                        title = "${KeyRules.keyName(code)}  →  ${actionLabel(action, apps)}",
-                        options = listOf(
-                            "Cambia azione" to { overlay = Overlay.KeyAction },
-                            "Togli (torna normale)" to { KeyRules.remove(context, code); keysFocus = 0; overlay = Overlay.Keys },
-                            "Annulla" to { overlay = Overlay.Keys },
-                        ),
-                        onDismiss = { overlay = Overlay.Keys },
-                    )
-                }
-            }
-            Overlay.KeyCapture -> KeyCaptureOverlay(
-                onKey = { code -> keyCode = code; overlay = Overlay.KeyAction },
-                onDismiss = { overlay = Overlay.Keys },
-            )
-            Overlay.KeyAction -> {
-                val code = keyCode ?: 0
-                fun save(action: KeyAction) {
-                    KeyRules.set(context, code, action)
-                    keysFocus = KeyRules.current(context).keys.indexOf(code).coerceAtLeast(0)
-                    overlay = Overlay.Keys
-                }
-                OptionsOverlay(
-                    title = "${KeyRules.keyName(code)}: cosa deve fare?",
-                    options = listOf(
-                        "Apri app…" to { overlay = Overlay.KeyApp },
-                        "Volume software +${Volume.STEP}%" to { save(KeyAction.VolumeUp) },
-                        "Volume software −${Volume.STEP}%" to { save(KeyAction.VolumeDown) },
-                        "Annulla" to { overlay = Overlay.Keys },
-                    ),
-                    onDismiss = { overlay = Overlay.Keys },
-                )
-            }
-            Overlay.KeyApp -> {
-                val code = keyCode ?: 0
-                val all = (apps.visible + apps.hidden).sortedBy { it.label.lowercase() }
-                OptionsOverlay(
-                    title = "${KeyRules.keyName(code)} apre…",
-                    options = all.map { app ->
-                        app.label to {
-                            KeyRules.set(context, code, KeyAction.OpenApp(app.packageName))
-                            keysFocus = KeyRules.current(context).keys.indexOf(code).coerceAtLeast(0)
-                            overlay = Overlay.Keys
-                        }
-                    } + ("Annulla" to { overlay = Overlay.KeyAction }),
-                    icons = all.map { it.icon },
-                    onDismiss = { overlay = Overlay.KeyAction },
-                )
-            }
             Overlay.None -> Unit
         }
 
@@ -629,14 +542,6 @@ fun HomeScreen(
             }
         }
     }
-}
-
-/** "MyTV", "Volume software +5%"… for the list of key rules. */
-private fun actionLabel(action: KeyAction, apps: AppsState): String = when (action) {
-    is KeyAction.OpenApp -> (apps.visible + apps.hidden).firstOrNull { it.packageName == action.packageName }?.label
-        ?: action.packageName
-    KeyAction.VolumeUp -> "Volume +${Volume.STEP}%"
-    KeyAction.VolumeDown -> "Volume −${Volume.STEP}%"
 }
 
 @Composable
