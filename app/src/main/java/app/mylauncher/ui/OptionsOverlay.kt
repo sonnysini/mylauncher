@@ -1,10 +1,13 @@
 package app.mylauncher.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -54,6 +58,8 @@ fun OptionsOverlay(
     focusIndex: Int = 0,
     /** Text under the title (release notes and the like). */
     message: String? = null,
+    /** Icon next to each option, same order as [options] (app pickers). */
+    icons: List<ImageBitmap?>? = null,
 ) {
     val first = remember { FocusRequester() }
     var armed by remember { mutableStateOf(false) }
@@ -100,7 +106,19 @@ fun OptionsOverlay(
                         ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
                     ) {
-                        Text(label, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                        val icon = icons?.getOrNull(i)
+                        if (icon == null) {
+                            Text(label, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                        } else {
+                            Row(
+                                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Image(icon, contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)))
+                                Text(label, fontSize = 16.sp, maxLines = 1)
+                            }
+                        }
                     }
                 }
             }

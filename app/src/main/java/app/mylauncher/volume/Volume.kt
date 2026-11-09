@@ -15,6 +15,18 @@ import kotlinx.coroutines.flow.StateFlow
 object Volume {
     const val STEP = 5
 
+    /** Cut per percentage point: 5 points ≈ 1.2 dB, 70% ≈ -7 dB, 5% ≈ -23 dB. */
+    const val DB_PER_POINT = 0.24
+    /** Bottom of the Fire's volume effect: 0% is silence. */
+    const val MUTE_MB = -9600
+
+    /** Target attenuation for [percent], in millibels (0 = untouched). */
+    fun millibels(percent: Int): Int = when {
+        percent >= 100 -> 0
+        percent <= 0 -> MUTE_MB
+        else -> (-(100 - percent) * DB_PER_POINT * 100).toInt()
+    }
+
     private const val PREFS = "volume"
     private const val KEY = "percent"
 

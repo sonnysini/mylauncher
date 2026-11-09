@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">My Launcher</string>
+    <string name="key_service_label">My Launcher · tasti telecomando</string>
+    <string name="key_service_description">Esegue le azioni scelte in My Launcher per i tasti del telecomando (apri app, volume). Legge solo i tasti premuti, non il contenuto dello schermo.</string>
 </resources>
