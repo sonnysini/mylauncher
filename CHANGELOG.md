@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.0 — 9 novembre 2026
+- **Volume** nelle impostazioni (ingranaggio): abbassa l'audio di tutta la Fire a passi del 5%, sopra il volume della TV o del proiettore. ◀ ▶ sulla barra lo cambiano subito; "Ripristina 100%" lo toglie. Resta impostato dopo standby e riavvio. Di base è al 100%, cioè spento.
+
 ## 0.7.1 — 3 novembre 2026
 - **OpenTV ora si chiama MyTV**: la riga canali e la riga Calcio usano il nome nuovo. Nessun cambio di collegamento: l'app è la stessa.
 

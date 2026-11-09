@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import app.mylauncher.ui.HomeScreen
 import app.mylauncher.ui.LauncherTheme
+import app.mylauncher.volume.Volume
 
 class MainActivity : ComponentActivity() {
 
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Software volume cut: (re)start its service if one is set.
+        Volume.sync(this)
         registerReceiver(
             packageReceiver,
             IntentFilter().apply {
