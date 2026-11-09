@@ -70,6 +70,8 @@ object KeyRules {
     }
 
     fun keyName(keyCode: Int): String = NAMES[keyCode]
+        // Amazon's own codes (LIVE_TV is the TV key of the Fire remotes) exist only in Fire OS.
+        ?: FIRE_NAMES[KeyEvent.keyCodeToString(keyCode)]
         ?: KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_").replace('_', ' ').lowercase()
             .replaceFirstChar { it.uppercase() }
 
@@ -104,9 +106,10 @@ object KeyRules {
         KeyEvent.KEYCODE_UNKNOWN,
     )
 
-    private val NAMES = mapOf(
+    private val FIRE_NAMES: Map<String, String> = mapOf("KEYCODE_LIVE_TV" to "Tasto TV")
+
+    private val NAMES: Map<Int, String> = mapOf(
         KeyEvent.KEYCODE_TV to "Tasto TV",
-        KeyEvent.KEYCODE_LIVE_TV to "Tasto TV",
         KeyEvent.KEYCODE_GUIDE to "Guida",
         KeyEvent.KEYCODE_VOLUME_UP to "Volume +",
         KeyEvent.KEYCODE_VOLUME_DOWN to "Volume −",
