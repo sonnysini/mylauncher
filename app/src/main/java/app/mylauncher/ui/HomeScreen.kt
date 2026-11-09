@@ -72,6 +72,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Text
 import app.mylauncher.BuildConfig
+import app.mylauncher.volume.Volume
 import app.mylauncher.HomeViewModel
 import app.mylauncher.LoginState
 import app.mylauncher.UpdateState
@@ -115,7 +116,7 @@ private val Focused.colorSource: Any?
         is Focused.Tv -> channel.logo
     }
 
-private enum class Overlay { None, Settings, Profiles, Login, Hidden, Rows, City }
+private enum class Overlay { None, Settings, Profiles, Login, Hidden, Rows, City, Volume }
 
 @Composable
 fun HomeScreen(
@@ -128,6 +129,8 @@ fun HomeScreen(
     val weather by viewModel.weather.collectAsStateWithLifecycle()
     val nuvio by viewModel.nuvioState.collectAsStateWithLifecycle()
     val login by viewModel.login.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val volume by remember { Volume.percent(context) }.collectAsStateWithLifecycle()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val profileId by viewModel.profileId.collectAsStateWithLifecycle()
     val openTv by viewModel.openTvState.collectAsStateWithLifecycle()
@@ -415,15 +418,18 @@ fun HomeScreen(
             )
         }
 
+        // Back from Volume lands on the Volume entry, not on the first line.
+        var settingsFocus by remember { mutableStateOf(0) }
         // Focus goes back once the overlay has left the composition: while it is there its focus
         // trap turns the request down and the focus lands on the gear.
-        val close = { overlay = Overlay.None; restoreFocus = true }
+        val close = { overlay = Overlay.None; restoreFocus = true; settingsFocus = 0 }
         LaunchedEffect(overlay, restoreFocus) {
             if (overlay == Overlay.None && restoreFocus) { restoreFocus = false; focusHome() }
         }
         when (overlay) {
             Overlay.Settings -> OptionsOverlay(
                 title = "Impostazioni",
+                focusIndex = settingsFocus,
                 options = buildList<Pair<String, () -> Unit>> {
                     if (nuvio.available) {
                         if (nuvio.signedIn) {
@@ -435,6 +441,8 @@ fun HomeScreen(
                             add("Collega account Nuvio" to { viewModel.startLogin(); overlay = Overlay.Login })
                         }
                     }
+                    val volumeIndex = size
+                    add("Volume: ${volume ?: 100}%" to { settingsFocus = volumeIndex; overlay = Overlay.Volume })
                     add("Ordine righe" to { overlay = Overlay.Rows })
                     add("Città meteo: ${city.name}" to { overlay = Overlay.City })
                     add("Cerca aggiornamenti · v${BuildConfig.VERSION_NAME}" to { overlay = Overlay.None; viewModel.checkUpdate(manual = true) })
@@ -490,6 +498,11 @@ fun HomeScreen(
                 onSearch = viewModel::searchCity,
                 onPick = { viewModel.setCity(it); close() },
                 onClose = close,
+            )
+            Overlay.Volume -> VolumeOverlay(
+                percent = volume ?: 100,
+                onChange = { Volume.set(context, it) },
+                onDismiss = { overlay = Overlay.Settings },
             )
             Overlay.None -> Unit
         }
