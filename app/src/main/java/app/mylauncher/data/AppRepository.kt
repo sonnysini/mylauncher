@@ -7,6 +7,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.ui.graphics.ImageBitmap
@@ -76,7 +78,7 @@ class AppRepository(private val context: Context) {
         // a 1 GB stick (a 4K-sized drawable would otherwise be rasterised at full size).
         val banner = (ai.loadBanner(pm) ?: ai.applicationInfo.loadBanner(pm))
             ?.toBitmap(BANNER_W, BANNER_H, Bitmap.Config.ARGB_8888)?.asImageBitmap()
-        val icon = ai.loadIcon(pm).toBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888).asImageBitmap()
+        val icon = ai.loadIcon(pm).toFittedBitmap(ICON_PX).asImageBitmap()
         return AppEntry(
             packageName = ai.packageName,
             label = info.loadLabel(pm).toString(),
@@ -86,6 +88,26 @@ class AppRepository(private val context: Context) {
             banner = banner,
             icon = icon,
         )
+    }
+
+    /**
+     * The icon in a square bitmap at its own proportions: some Fire icons are not square, and
+     * toBitmap(size, size) would stretch them.
+     */
+    private fun Drawable.toFittedBitmap(px: Int): Bitmap {
+        val w = intrinsicWidth.takeIf { it > 0 } ?: px
+        val h = intrinsicHeight.takeIf { it > 0 } ?: px
+        val scale = px.toFloat() / maxOf(w, h)
+        val dw = (w * scale).toInt().coerceAtLeast(1)
+        val dh = (h * scale).toInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        val left = (px - dw) / 2
+        val top = (px - dh) / 2
+        val old = copyBounds()
+        setBounds(left, top, left + dw, top + dh)
+        draw(Canvas(bitmap))
+        bounds = old
+        return bitmap
     }
 
     private companion object {

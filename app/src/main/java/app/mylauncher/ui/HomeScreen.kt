@@ -62,7 +62,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -786,8 +785,8 @@ private fun AppCard(
                         Text(app.label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                // The whole icon, no label: a touch larger than the tile trims the transparent
-                // margin most launcher icons carry, its own colour fills what is left.
+                // The whole icon, no label, never cropped nor stretched: its own colour fills
+                // whatever its shape leaves free.
                 else -> Box(
                     Modifier.fillMaxSize().background(
                         // A light colour would swallow a white glyph on a transparent icon.
@@ -797,8 +796,8 @@ private fun AppCard(
                     Image(
                         app.icon,
                         contentDescription = app.label,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.12f; scaleY = 1.12f },
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
