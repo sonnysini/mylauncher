@@ -12,9 +12,6 @@ import androidx.compose.ui.unit.dp
 /** Tiles per row: every row shows exactly this many whole cards, margin to margin. */
 const val CardsPerRow = 5
 
-/** Squares the App row holds next to the open (16:9) one. */
-const val AppSquares = 7
-
 val Margin = 48.dp
 val CardGap = 18.dp
 
@@ -28,9 +25,6 @@ data class CardDims(
     val height: Dp,
     val gap: Dp,
     val margin: Dp,
-    /** App row: squares are [height] wide, gaps are narrower so 7 squares + 1 banner fill it. */
-    val appGap: Dp,
-    val appMargin: Dp,
 )
 
 fun cardDims(screenWidth: Dp, density: Density): CardDims = with(density) {
@@ -40,20 +34,18 @@ fun cardDims(screenWidth: Dp, density: Density): CardDims = with(density) {
     val w = (avail - (CardsPerRow - 1) * gap) / CardsPerRow
     val h = w * 9 / 16
     val margin = (total - CardsPerRow * w - (CardsPerRow - 1) * gap) / 2
-    val appGap = (avail - AppSquares * h - w) / AppSquares
-    val appMargin = (total - AppSquares * h - w - AppSquares * appGap) / 2
-    CardDims(w.toDp(), h.toDp(), gap.toDp(), margin.toDp(), appGap.toDp(), appMargin.toDp())
+    CardDims(w.toDp(), h.toDp(), gap.toDp(), margin.toDp())
 }
 
 val LocalCardDims = staticCompositionLocalOf {
-    CardDims(158.dp, 88.dp, 18.dp, 48.dp, 12.dp, 48.dp)
+    CardDims(158.dp, 88.dp, 18.dp, 48.dp)
 }
 
 /**
  * Horizontal scrolling that keeps whole cards: the focused card is brought to the inner edge of
  * the side margin, not to the edge of the screen. A row holds a whole number of cards, so the
  * others land on the grid too and nothing is cut in half. Recomputed every frame from the live
- * bounds, which also follows an app tile while it widens into its banner.
+ * bounds.
  */
 @OptIn(ExperimentalFoundationApi::class)
 class MarginBringIntoView(private val marginPx: Float) : BringIntoViewSpec {

@@ -62,7 +62,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -192,11 +191,6 @@ fun HomeScreen(
     var focusAfterMenu by remember { mutableStateOf<String?>(null) }
     /** Where the focused app sat, so an uninstalled app hands the focus to its neighbour. */
     var lastAppIndex by remember { mutableStateOf(0) }
-    /**
-     * The app shown open (as a banner). It stays open when the focus leaves the row: the row is
-     * sized for 7 squares + 1 banner, all squares would leave one cut at the edge.
-     */
-    var openApp by remember { mutableStateOf<String?>(null) }
 
     fun refocusApp(pkg: String?) {
         val target = pkg?.takeIf { p -> apps.visible.any { it.packageName == p } }
@@ -257,7 +251,7 @@ fun HomeScreen(
     LaunchedEffect(apps.visible, moving) {
         val pkg = moving ?: return@LaunchedEffect
         val index = apps.visible.indexOfFirst { it.packageName == pkg }
-        if (index >= 0) appsListState.keepWithNeighbours(index, AppSquares + 1)
+        if (index >= 0) appsListState.keepWithNeighbours(index, CardsPerRow)
     }
 
     BackHandler(enabled = true) {}
@@ -367,8 +361,8 @@ fun HomeScreen(
                     RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare, nascondere o disinstallare")
                     GridRow(
                         appsListState,
-                        dims.appMargin,
-                        dims.appGap,
+                        dims.margin,
+                        dims.gap,
                         Modifier.onPreviewKeyEvent { e ->
                             val pkg = moving ?: return@onPreviewKeyEvent false
                             when {
@@ -387,14 +381,11 @@ fun HomeScreen(
                             AppCard(
                                 app = app,
                                 moving = moving == app.packageName,
-                                open = app.packageName == (openApp?.takeIf { p -> apps.visible.any { it.packageName == p } }
-                                    ?: apps.visible.firstOrNull()?.packageName),
                                 modifier = Modifier
                                     .focusRequester(requesterFor("app:${app.packageName}"))
                                     .onFocusChanged {
                                         if (it.isFocused) {
                                             focused = Focused.App(app)
-                                            openApp = app.packageName
                                             lastAppIndex = apps.visible.indexOf(app).coerceAtLeast(0)
                                         }
                                     },
@@ -407,7 +398,6 @@ fun HomeScreen(
                                 TextCard(
                                     "Nascoste (${apps.hidden.size})",
                                     modifier = Modifier.onFocusChanged { if (it.isFocused) focused = null },
-                                    width = dims.height,
                                     onClick = { overlay = Overlay.Hidden },
                                 )
                             }
@@ -738,68 +728,38 @@ private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Uni
     }
 }
 
-/**
- * App tile: a square filled by the app's icon; when [open] (focused, or last focused) it widens to 16:9 and turns into the
- * app's TV banner (or, without one, its icon on the icon's own colour).
- */
+/** App tile: the app's TV banner, or its icon and name when it has none. */
 @Composable
 private fun AppCard(
     app: AppEntry,
     moving: Boolean,
-    open: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val dims = LocalCardDims.current
-    val width by animateDpAsState(
-        if (open) dims.width else dims.height,
-        tween(280, easing = FastOutSlowInEasing),
-        label = "appWidth",
-    )
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.size(width, dims.height),
+        modifier = modifier.size(dims.width, dims.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = CardDefaults.border(
             focusedBorder = Border(BorderStroke(3.dp, if (moving) Accent else Color.White), shape = CardShape),
         ),
-        colors = CardDefaults.colors(containerColor = Color(0xFF1B2433), focusedContainerColor = Color(0xFF1B2433)),
+        colors = CardDefaults.colors(containerColor = Color(0xFF1B2433)),
     ) {
-        Crossfade(targetState = open, animationSpec = tween(280), label = "appBanner") { wide ->
-            when {
-                wide && app.banner != null ->
-                    Image(app.banner, contentDescription = app.label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                wide -> {
-                    val tint = rememberImageColor(app.icon) ?: Color(0xFF1B2433)
-                    Row(
-                        Modifier.fillMaxSize().background(
-                            Brush.linearGradient(listOf(tint.copy(alpha = 0.85f), tint.copy(alpha = 0.45f))),
-                        ).padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Image(app.icon, contentDescription = null, modifier = Modifier.size(44.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(app.label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                // The whole icon, no label, never cropped nor stretched: its own colour fills
-                // whatever its shape leaves free.
-                else -> Box(
-                    Modifier.fillMaxSize().background(
-                        // A light colour would swallow a white glyph on a transparent icon.
-                        rememberImageColor(app.icon)?.takeIf { it.luminance() < 0.5f } ?: Color(0xFF1B2433),
-                    ),
-                ) {
-                    Image(
-                        app.icon,
-                        contentDescription = app.label,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+        if (app.banner != null) {
+            Image(app.banner, contentDescription = app.label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else {
+            Column(
+                Modifier.fillMaxSize().padding(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Image(app.icon, contentDescription = null, modifier = Modifier.size(44.dp))
+                Spacer(Modifier.height(5.dp))
+                Text(app.label, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

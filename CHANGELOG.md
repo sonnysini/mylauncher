@@ -3,7 +3,7 @@
 ## 0.10.0 — 12 novembre 2026
 - **Home ordinata**: 5 tessere intere per fila, da margine a margine, e sotto l'hero sempre 2 file intere. ↓ / ↑ fanno salire o scendere di una fila intera; lo scorrimento laterale va a tessere intere, niente più tessere tagliate a metà.
 - Titolo e sottotitolo delle file su una riga sola; hero un po' più basso.
-- **Riga App a quadrati**: icona intera, senza scritte; l'app a fuoco si allarga e diventa il suo banner TV (se non ce l'ha, icona sul suo colore).
+- **Riga App** con le stesse tessere larghe delle altre file (banner TV, o icona e nome), icone nitide e mai deformate.
 
 ## 0.9.0 — 9 novembre 2026
 - **Volume più ripido**: circa 1,2 dB ogni 5% (70% ≈ −7 dB, 5% ≈ −23 dB) e 0% = muto; prima il fondo scala era −15 dB.
