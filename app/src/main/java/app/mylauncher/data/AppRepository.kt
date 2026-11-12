@@ -91,6 +91,6 @@ class AppRepository(private val context: Context) {
     private companion object {
         const val BANNER_W = 320
         const val BANNER_H = 180
-        const val ICON_PX = 128
+        const val ICON_PX = 192
     }
 }

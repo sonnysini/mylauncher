@@ -62,6 +62,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -738,7 +739,7 @@ private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Uni
 }
 
 /**
- * App tile: a square with icon and name; when [open] (focused, or last focused) it widens to 16:9 and turns into the
+ * App tile: a square filled by the app's icon; when [open] (focused, or last focused) it widens to 16:9 and turns into the
  * app's TV banner (or, without one, its icon on the icon's own colour).
  */
 @Composable
@@ -784,14 +785,15 @@ private fun AppCard(
                         Text(app.label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                else -> Column(
-                    Modifier.fillMaxSize().padding(6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Image(app.icon, contentDescription = null, modifier = Modifier.size(44.dp))
-                    Spacer(Modifier.height(5.dp))
-                    Text(app.label, fontSize = 11.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // The whole icon, no label: a touch larger than the tile trims the transparent
+                // margin most launcher icons carry, its own colour fills what is left.
+                else -> Box(Modifier.fillMaxSize().background(rememberImageColor(app.icon) ?: Color(0xFF1B2433))) {
+                    Image(
+                        app.icon,
+                        contentDescription = app.label,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.12f; scaleY = 1.12f },
+                    )
                 }
             }
         }
