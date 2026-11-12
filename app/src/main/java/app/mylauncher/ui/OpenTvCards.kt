@@ -108,9 +108,9 @@ fun MatchCard(match: Match, modifier: Modifier, onClick: () -> Unit) {
                 Brush.verticalGradient(listOf(Color(0xFF22324D), Color(0xFF141B27))),
             ),
         ) {
-            Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 7.dp), verticalArrangement = Arrangement.SpaceBetween) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Crest(match.homeCrest, 40.dp)
+                    Crest(match.homeCrest, 32.dp)
                     Text(
                         // No score: a game is watched later too (OpenTV no longer sends it).
                         hour(match.kickoff),
@@ -118,7 +118,7 @@ fun MatchCard(match: Match, modifier: Modifier, onClick: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                     )
-                    Crest(match.awayCrest, 40.dp)
+                    Crest(match.awayCrest, 32.dp)
                 }
                 Column {
                     Text(
