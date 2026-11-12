@@ -189,6 +189,11 @@ fun HomeScreen(
     var focusAfterMenu by remember { mutableStateOf<String?>(null) }
     /** Where the focused app sat, so an uninstalled app hands the focus to its neighbour. */
     var lastAppIndex by remember { mutableStateOf(0) }
+    /**
+     * The app shown open (as a banner). It stays open when the focus leaves the row: the row is
+     * sized for 7 squares + 1 banner, all squares would leave one cut at the edge.
+     */
+    var openApp by remember { mutableStateOf<String?>(null) }
 
     fun refocusApp(pkg: String?) {
         val target = pkg?.takeIf { p -> apps.visible.any { it.packageName == p } }
@@ -379,11 +384,14 @@ fun HomeScreen(
                             AppCard(
                                 app = app,
                                 moving = moving == app.packageName,
+                                open = app.packageName == (openApp?.takeIf { p -> apps.visible.any { it.packageName == p } }
+                                    ?: apps.visible.firstOrNull()?.packageName),
                                 modifier = Modifier
                                     .focusRequester(requesterFor("app:${app.packageName}"))
                                     .onFocusChanged {
                                         if (it.isFocused) {
                                             focused = Focused.App(app)
+                                            openApp = app.packageName
                                             lastAppIndex = apps.visible.indexOf(app).coerceAtLeast(0)
                                         }
                                     },
@@ -720,19 +728,19 @@ private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Uni
 }
 
 /**
- * App tile: a square with icon and name; with the focus it widens to 16:9 and turns into the
+ * App tile: a square with icon and name; when [open] (focused, or last focused) it widens to 16:9 and turns into the
  * app's TV banner (or, without one, its icon on the icon's own colour).
  */
 @Composable
 private fun AppCard(
     app: AppEntry,
     moving: Boolean,
+    open: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val dims = LocalCardDims.current
-    var open by remember { mutableStateOf(false) }
     val width by animateDpAsState(
         if (open) dims.width else dims.height,
         tween(280, easing = FastOutSlowInEasing),
@@ -741,9 +749,7 @@ private fun AppCard(
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier
-            .onFocusChanged { open = it.isFocused }
-            .size(width, dims.height),
+        modifier = modifier.size(width, dims.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = CardDefaults.border(
