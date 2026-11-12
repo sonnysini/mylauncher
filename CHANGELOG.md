@@ -3,6 +3,7 @@
 ## 0.10.0 — 12 novembre 2026
 - **Home ordinata**: 5 tessere intere per fila, da margine a margine, e sotto l'hero sempre 2 file intere. ↓ / ↑ fanno salire o scendere di una fila intera; lo scorrimento laterale va a tessere intere, niente più tessere tagliate a metà.
 - Titolo e sottotitolo delle file su una riga sola; hero un po' più basso.
+- **Partite come in MyTV**: tessere più pulite con i colori delle due squadre in diagonale, stemmi grandi e un'etichetta con giorno e ora (minuto in rosso se in diretta, Highlights se finita). I nomi restano nell'hero.
 - **Riga App** con le stesse tessere larghe delle altre file (banner TV, o icona e nome), icone nitide e mai deformate.
 
 ## 0.9.0 — 9 novembre 2026
