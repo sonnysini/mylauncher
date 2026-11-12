@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.tween
@@ -602,14 +604,22 @@ private fun GridRow(
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit,
 ) {
-    val marginPx = with(LocalDensity.current) { margin.toPx() }
+    val density = LocalDensity.current
+    val marginPx = with(density) { margin.toPx() }
+    // Room for the focused card's zoom and border, but less than a gap: the next card off the
+    // grid never peeks into the side margin.
+    val slackPx = with(density) { 8.dp.toPx() }
     val spec = remember(marginPx) { MarginBringIntoView(marginPx) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         LazyRow(
             state = state,
             contentPadding = PaddingValues(horizontal = margin, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(gap),
-            modifier = modifier,
+            modifier = modifier.drawWithContent {
+                clipRect(left = marginPx - slackPx, right = size.width - marginPx + slackPx) {
+                    this@drawWithContent.drawContent()
+                }
+            },
             content = content,
         )
     }
