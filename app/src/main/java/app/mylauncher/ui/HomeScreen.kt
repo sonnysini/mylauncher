@@ -5,6 +5,22 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,14 +42,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,11 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -85,8 +94,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.Flow
 
-private val CardWidth = 196.dp
-private val CardHeight = 110.dp
 private val CardShape = RoundedCornerShape(12.dp)
 
 private fun isOk(key: Key) = key == Key.DirectionCenter || key == Key.Enter || key == Key.NumPadEnter
@@ -143,6 +150,25 @@ fun HomeScreen(
     // A match on now: Calcio goes to the top and takes the first focus.
     val liveFirst = openTv.anyLive
     val rows = if (liveFirst) listOf(HomeRow.CALCIO) + (rowOrder - HomeRow.CALCIO) else rowOrder
+    /** Index (in [shown]) of the row at the top of the two on screen. */
+    var firstRow by remember { mutableStateOf(0) }
+    /** Rows with something to show: an empty one would take a whole slot of the two. */
+    val shown = rows.filter { row ->
+        when (row) {
+            HomeRow.CALCIO -> openTv.permitted && (matches.isNotEmpty() || openTv.loaded)
+            HomeRow.NUVIO -> nuvio.available
+            HomeRow.OPENTV -> openTv.permitted && tvChannels.isNotEmpty()
+            HomeRow.APPS -> true
+        }
+    }
+    fun showRow(index: Int) {
+        firstRow = when {
+            index < firstRow -> index
+            index > firstRow + 1 -> index - 1
+            else -> firstRow
+        }
+    }
+    LaunchedEffect(shown.size) { firstRow = firstRow.coerceIn(0, (shown.size - 2).coerceAtLeast(0)) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(openTv) { now = System.currentTimeMillis() }
 
@@ -150,7 +176,6 @@ fun HomeScreen(
     val nuvioListState = rememberLazyListState()
     val calcioListState = rememberLazyListState()
     val tvListState = rememberLazyListState()
-    val rowsScroll = rememberScrollState()
     val requesters = remember { mutableStateMapOf<String, FocusRequester>() }
     fun requesterFor(key: String) = requesters.getOrPut(key) { FocusRequester() }
 
@@ -199,7 +224,7 @@ fun HomeScreen(
         homePressed.collect {
             menuFor = null; overlay = Overlay.None; moving = null
             viewModel.cancelLogin()
-            rowsScroll.scrollTo(0)
+            firstRow = 0
             appsListState.scrollToItem(0)
             nuvioListState.scrollToItem(0)
             calcioListState.scrollToItem(0)
@@ -226,7 +251,7 @@ fun HomeScreen(
     LaunchedEffect(apps.visible, moving) {
         val pkg = moving ?: return@LaunchedEffect
         val index = apps.visible.indexOfFirst { it.packageName == pkg }
-        if (index >= 0) appsListState.keepWithNeighbours(index)
+        if (index >= 0) appsListState.keepWithNeighbours(index, CardsPerRow)
     }
 
     BackHandler(enabled = true) {}
@@ -241,26 +266,28 @@ fun HomeScreen(
         val glow by animateColorAsState(rememberImageColor(focused?.colorSource) ?: Accent, tween(500), label = "glow")
         Backdrop((focused as? Focused.Nuvio)?.item?.backdrop, glow)
 
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val dims = remember(maxWidth, density) { cardDims(maxWidth, density) }
+        CompositionLocalProvider(LocalCardDims provides dims) {
         Column(Modifier.fillMaxSize().padding(top = 28.dp)) {
             Header(weather, onOpenSettings = { overlay = Overlay.Settings }, modifier = Modifier.padding(horizontal = 48.dp))
 
-            Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(190.dp))
+            Hero(focused, moving != null, Modifier.padding(horizontal = 48.dp).height(170.dp))
 
-            Column(Modifier.fillMaxWidth().weight(1f).fadeTop(rowsScroll.value > 0).verticalScroll(rowsScroll)) {
+            // Exactly two whole rows under the hero; ↓ / ↑ past them moves the page by one row.
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
+                val rowHeight = maxHeight / 2
+                val pageOffset by animateDpAsState(-rowHeight * firstRow, tween(300, easing = FastOutSlowInEasing), label = "rows")
                 @Composable
                 fun CalcioRow() {
-                    if (!openTv.permitted || (matches.isEmpty() && !openTv.loaded)) return
                     RowTitle("Calcio", if (liveFirst) "Serie A · in diretta ora" else "Serie A · da MyTV")
-                    LazyRow(
-                        state = calcioListState,
-                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    ) {
+                    GridRow(calcioListState, dims.margin, dims.gap) {
                         items(matches, key = { "match:${it.id}" }) { match ->
                             MatchCard(
                                 match,
                                 Modifier
-                                    .size(CardWidth, CardHeight)
+                                    .size(dims.width, dims.height)
                                     .focusRequester(requesterFor("match:${match.id}"))
                                     .onFocusChanged { if (it.isFocused) focused = Focused.Game(match) },
                             ) { onLaunch(viewModel.matchIntent(match)) }
@@ -276,13 +303,8 @@ fun HomeScreen(
 
                 @Composable
                 fun NuvioRow() {
-                    if (!nuvio.available) return
                     RowTitle("Continua a guardare", "Nuvio")
-                    LazyRow(
-                        state = nuvioListState,
-                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    ) {
+                    GridRow(nuvioListState, dims.margin, dims.gap) {
                         when {
                             !nuvio.signedIn -> item(key = "__link") {
                                 TextCard("Collega il tuo account Nuvio", Modifier.onFocusChanged { if (it.isFocused) focused = null }) {
@@ -313,19 +335,14 @@ fun HomeScreen(
 
                 @Composable
                 fun TvRow() {
-                    if (!openTv.permitted || tvChannels.isEmpty()) return
                     RowTitle("MyTV", "Visti di recente e preferiti")
-                    LazyRow(
-                        state = tvListState,
-                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    ) {
+                    GridRow(tvListState, dims.margin, dims.gap) {
                         items(tvChannels, key = { "tv:${it.id}" }) { channel ->
                             ChannelCard(
                                 channel,
                                 now,
                                 Modifier
-                                    .size(CardWidth, CardHeight)
+                                    .size(dims.width, dims.height)
                                     .focusRequester(requesterFor("tv:${channel.id}"))
                                     .onFocusChanged { if (it.isFocused) focused = Focused.Tv(channel) },
                             ) { onLaunch(viewModel.channelIntent(channel)) }
@@ -342,11 +359,11 @@ fun HomeScreen(
                 @Composable
                 fun AppsRow() {
                     RowTitle("App", if (moving != null) "◀ ▶ per spostare, OK per confermare" else "Tieni premuto OK per spostare, nascondere o disinstallare")
-                    LazyRow(
-                        state = appsListState,
-                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        modifier = Modifier.onPreviewKeyEvent { e ->
+                    GridRow(
+                        appsListState,
+                        dims.margin,
+                        dims.gap,
+                        Modifier.onPreviewKeyEvent { e ->
                             val pkg = moving ?: return@onPreviewKeyEvent false
                             when {
                                 e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft -> viewModel.move(pkg, -1)
@@ -379,7 +396,7 @@ fun HomeScreen(
                         if (apps.hidden.isNotEmpty()) {
                             item(key = "__hidden") {
                                 TextCard(
-                                    "App nascoste (${apps.hidden.size})",
+                                    "Nascoste (${apps.hidden.size})",
                                     modifier = Modifier.onFocusChanged { if (it.isFocused) focused = null },
                                     onClick = { overlay = Overlay.Hidden },
                                 )
@@ -388,18 +405,33 @@ fun HomeScreen(
                     }
                 }
 
-                rows.forEach { row ->
-                    key(row) {
-                        when (row) {
-                            HomeRow.NUVIO -> NuvioRow()
-                            HomeRow.CALCIO -> CalcioRow()
-                            HomeRow.OPENTV -> TvRow()
-                            HomeRow.APPS -> AppsRow()
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(Alignment.Top, unbounded = true)
+                        .offset(y = pageOffset),
+                ) {
+                    shown.forEachIndexed { index, row ->
+                        key(row) {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(rowHeight)
+                                    .onFocusChanged { if (it.hasFocus) showRow(index) },
+                            ) {
+                                when (row) {
+                                    HomeRow.NUVIO -> NuvioRow()
+                                    HomeRow.CALCIO -> CalcioRow()
+                                    HomeRow.OPENTV -> TvRow()
+                                    HomeRow.APPS -> AppsRow()
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
             }
+        }
+        }
         }
 
         menuFor?.let { app ->
@@ -546,9 +578,41 @@ fun HomeScreen(
 
 @Composable
 private fun RowTitle(title: String, subtitle: String) {
-    Column(Modifier.padding(start = 48.dp, top = 6.dp)) {
-        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(subtitle, fontSize = 13.sp, color = Muted)
+    Row(Modifier.padding(start = 48.dp, end = 48.dp, top = 4.dp)) {
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alignByBaseline())
+        Spacer(Modifier.width(12.dp))
+        Text(subtitle, fontSize = 13.sp, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.alignByBaseline())
+    }
+}
+
+/** A row of cards that scrolls by whole cards, never leaving one cut at the screen edge. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GridRow(
+    state: LazyListState,
+    margin: Dp,
+    gap: Dp,
+    modifier: Modifier = Modifier,
+    content: LazyListScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    val marginPx = with(density) { margin.toPx() }
+    // Room for the focused card's zoom and border, but less than a gap: the next card off the
+    // grid never peeks into the side margin.
+    val slackPx = with(density) { 8.dp.toPx() }
+    val spec = remember(marginPx) { MarginBringIntoView(marginPx) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
+        LazyRow(
+            state = state,
+            contentPadding = PaddingValues(horizontal = margin, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            modifier = modifier.drawWithContent {
+                clipRect(left = marginPx - slackPx, right = size.width - marginPx + slackPx) {
+                    this@drawWithContent.drawContent()
+                }
+            },
+            content = content,
+        )
     }
 }
 
@@ -633,34 +697,12 @@ private fun Hero(focused: Focused?, moving: Boolean, modifier: Modifier) {
     }
 }
 
-/**
- * Scrolls the App row so the tile at [index] keeps a whole neighbour on each side while it is
- * being moved; without the margin the tile ends half under the left edge.
- */
-private suspend fun LazyListState.keepWithNeighbours(index: Int) {
-    val info = layoutInfo
-    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
-    if (item == null) {
-        animateScrollToItem((index - 1).coerceAtLeast(0))
-        return
-    }
-    val margin = item.size + info.mainAxisItemSpacing
-    val start = info.viewportStartOffset + info.beforeContentPadding
-    val end = info.viewportEndOffset - info.afterContentPadding
-    when {
-        item.offset - margin < start ->
-            animateScrollBy((item.offset - margin - start).toFloat())
-        item.offset + item.size + margin > end ->
-            animateScrollBy((item.offset + item.size + margin - end).toFloat())
-    }
-}
-
 @Composable
 private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Unit) {
     val context = LocalContext.current
     Card(
         onClick = onClick,
-        modifier = modifier.size(CardWidth, CardHeight),
+        modifier = modifier.size(LocalCardDims.current.width, LocalCardDims.current.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Color.White), shape = CardShape)),
@@ -686,6 +728,7 @@ private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Uni
     }
 }
 
+/** App tile: the app's TV banner, or its icon and name when it has none. */
 @Composable
 private fun AppCard(
     app: AppEntry,
@@ -694,10 +737,11 @@ private fun AppCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val dims = LocalCardDims.current
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.size(CardWidth, CardHeight),
+        modifier = modifier.size(dims.width, dims.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = CardDefaults.border(
@@ -709,40 +753,35 @@ private fun AppCard(
             Image(app.banner, contentDescription = app.label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Column(
-                Modifier.fillMaxSize().padding(8.dp),
+                Modifier.fillMaxSize().padding(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Image(app.icon, contentDescription = null, modifier = Modifier.size(52.dp))
-                Spacer(Modifier.height(6.dp))
-                Text(app.label, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Image(app.icon, contentDescription = null, modifier = Modifier.size(44.dp))
+                Spacer(Modifier.height(5.dp))
+                Text(app.label, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
 
 @Composable
-private fun TextCard(label: String, modifier: Modifier, onClick: () -> Unit) {
+private fun TextCard(
+    label: String,
+    modifier: Modifier,
+    width: Dp = LocalCardDims.current.width,
+    onClick: () -> Unit,
+) {
     Card(
         onClick = onClick,
-        modifier = modifier.size(CardWidth, CardHeight),
+        modifier = modifier.size(width, LocalCardDims.current.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Color.White), shape = CardShape)),
         colors = CardDefaults.colors(containerColor = Color(0xFF161D2A)),
     ) {
         Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
-            Text(label, fontSize = 15.sp, color = Muted, textAlign = TextAlign.Center)
+            Text(label, fontSize = 14.sp, color = Muted, textAlign = TextAlign.Center)
         }
     }
 }
-
-/** Rows scrolled up fade out under the hero instead of ending in a hard cut. */
-private fun Modifier.fadeTop(enabled: Boolean): Modifier = if (!enabled) this else
-    graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        drawRect(
-            Brush.verticalGradient(0f to Color.Transparent, 28.dp.toPx() / size.height to Color.Black),
-            blendMode = BlendMode.DstIn,
-        )
-    }

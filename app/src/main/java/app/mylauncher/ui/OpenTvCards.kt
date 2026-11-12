@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -89,50 +93,107 @@ fun Crest(url: String, size: Dp) {
     )
 }
 
+/**
+ * A team's main colour, toned down so the crests read on it (same table as MyTV's tiles).
+ * Teams not listed get a dark colour of their own from the name.
+ */
+private val teamColors = listOf(
+    "atalanta" to 0xFF1C4E8F, "bologna" to 0xFF1A2F48, "cagliari" to 0xFF8C1A2B, "como" to 0xFF1B3C8C,
+    "cremonese" to 0xFF8E1B2C, "empoli" to 0xFF0E4FA0, "fiorentina" to 0xFF4B2A85, "frosinone" to 0xFF1D4C9C,
+    "genoa" to 0xFF7A1424, "verona" to 0xFF113A78, "inter" to 0xFF00487A, "juventus" to 0xFF1E1E1E,
+    "lazio" to 0xFF4C87B9, "lecce" to 0xFF9C8A10, "milan" to 0xFFB0101A, "monza" to 0xFFB5121B,
+    "napoli" to 0xFF0E6E9E, "palermo" to 0xFFB5527A, "parma" to 0xFF1E3D7B, "pisa" to 0xFF1A2B5C,
+    "roma" to 0xFF8E1F2F, "salernitana" to 0xFF6E1B1F, "sampdoria" to 0xFF1B4A9E, "sassuolo" to 0xFF0F6B3A,
+    "spezia" to 0xFF2A2A2A, "torino" to 0xFF7A1A08, "udinese" to 0xFF2B2B2B, "venezia" to 0xFF0B5A3C,
+)
+
+private fun teamColor(name: String): Color {
+    val n = name.lowercase()
+    teamColors.firstOrNull { n.contains(it.first) }?.let { return Color(it.second) }
+    val hue = ((n.hashCode() and 0x7fffffff) % 360).toFloat()
+    return Color.hsv(hue, 0.55f, 0.38f)
+}
+
+/** Paints the box in two colours split on a slant: home left, away right. */
+private fun Modifier.split(home: Color, away: Color): Modifier = drawBehind {
+    drawRect(away)
+    val path = Path().apply {
+        moveTo(0f, 0f)
+        lineTo(size.width * 0.58f, 0f)
+        lineTo(size.width * 0.42f, size.height)
+        lineTo(0f, size.height)
+        close()
+    }
+    drawPath(path, home)
+}
+
+private val weekdayFormat = SimpleDateFormat("EEE", Locale.ITALY)
+
+/** The tile's chip: "OGGI 21:00", "GIO 18:45", "SAB 21 15:00", the live minute, Highlights. */
+private fun Match.chipLabel(): String = when (phase) {
+    MatchPhase.LIVE -> minute ?: "LIVE"
+    MatchPhase.FINISHED -> if (highlights != null) "▶ HIGHLIGHTS" else "FINALE"
+    MatchPhase.OFF -> "RINVIATA"
+    MatchPhase.SCHEDULED -> {
+        val now = Calendar.getInstance()
+        val day = Calendar.getInstance().apply { timeInMillis = kickoff }
+        val days = ((day.apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis -
+            (now.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis) / 86_400_000L).toInt()
+        val label = when {
+            days == 0 -> "Oggi"
+            days in 1..6 -> weekdayFormat.format(Date(kickoff)).trimEnd('.')
+            else -> dayFormat.format(Date(kickoff)).replace(".", "")
+        }
+        label.uppercase() + " " + hour(kickoff)
+    }
+}
+
+/**
+ * A game as MyTV draws it: the two teams' colours split on a slant, the crests big, a chip
+ * with day and time (or the live minute) top left. The names are in the hero above.
+ */
 @Composable
 fun MatchCard(match: Match, modifier: Modifier, onClick: () -> Unit) {
     val live = match.phase == MatchPhase.LIVE
+    val highlight = match.phase == MatchPhase.FINISHED && match.highlights != null
     Card(
         onClick = onClick,
         modifier = modifier,
         shape = CardDefaults.shape(TileShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),
-        border = CardDefaults.border(
-            border = if (live) Border(BorderStroke(2.dp, LiveRed.copy(alpha = 0.7f)), shape = TileShape) else Border.None,
-            focusedBorder = Border(BorderStroke(3.dp, Color.White), shape = TileShape),
-        ),
+        border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Color.White), shape = TileShape)),
         colors = CardDefaults.colors(containerColor = Color(0xFF1B2433)),
     ) {
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xFF22324D), Color(0xFF141B27))),
-            ),
-        ) {
-            Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Crest(match.homeCrest, 40.dp)
-                    Text(
-                        // No score: a game is watched later too (OpenTV no longer sends it).
-                        hour(match.kickoff),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                    )
-                    Crest(match.awayCrest, 40.dp)
-                }
-                Column {
-                    Text(
-                        "${match.home} – ${match.away}",
-                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        match.statusLabel(),
-                        fontSize = 11.sp, fontWeight = if (live) FontWeight.Bold else FontWeight.Normal,
-                        color = if (live) LiveRed else Soft, maxLines = 1,
-                    )
-                }
+        BoxWithConstraints(Modifier.fillMaxSize().split(teamColor(match.home), teamColor(match.away))) {
+            val crest = (maxWidth.value * 0.26f).coerceIn(32f, 52f).dp
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.4f)))))
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = maxWidth * 0.11f),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Crest(match.homeCrest, crest)
+                Crest(match.awayCrest, crest)
             }
+            Text(
+                match.chipLabel(),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (highlight) Color.Black else Color.White,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        when {
+                            live -> Color(0xFFE50914)
+                            highlight -> Color.White.copy(alpha = 0.92f)
+                            else -> Color.Black.copy(alpha = 0.65f)
+                        },
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
     }
 }
