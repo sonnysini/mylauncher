@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.11.0 — 13 novembre 2026
+- **Continua a guardare parte subito**: OK su una tessera Nuvio apre direttamente le fonti del film o dell'episodio (il prossimo, se quello prima è finito), non più la scheda. Con "Riutilizza ultimo link" o la riproduzione automatica attivi in Nuvio, il video parte da solo.
+
 ## 0.10.0 — 12 novembre 2026
 - **Home ordinata**: 5 tessere intere per fila, da margine a margine, e sotto l'hero sempre 2 file intere. ↓ / ↑ fanno salire o scendere di una fila intera; lo scorrimento laterale va a tessere intere, niente più tessere tagliate a metà.
 - Titolo e sottotitolo delle file su una riga sola; hero un po' più basso.
