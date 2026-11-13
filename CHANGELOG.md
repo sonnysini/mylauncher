@@ -2,6 +2,7 @@
 
 ## 0.11.0 — 13 novembre 2026
 - **Continua a guardare parte subito**: OK su una tessera Nuvio apre direttamente le fonti del film o dell'episodio (il prossimo, se quello prima è finito), non più la scheda. Con "Riutilizza ultimo link" o la riproduzione automatica attivi in Nuvio, il video parte da solo.
+- **Rimuovi da Continua a guardare**: tieni premuto OK su una tessera Nuvio. Il titolo viene tolto anche da Nuvio, su tutte le Fire, come il "Rimuovi" di Nuvio. Le rimozioni fatte dentro Nuvio di un "prossimo episodio" invece restano solo sulla Fire dove le fai e il launcher non le vede: per quelle usa questo.
 
 ## 0.10.0 — 12 novembre 2026
 - **Home ordinata**: 5 tessere intere per fila, da margine a margine, e sotto l'hero sempre 2 file intere. ↓ / ↑ fanno salire o scendere di una fila intera; lo scorrimento laterale va a tessere intere, niente più tessere tagliate a metà.

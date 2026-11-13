@@ -51,6 +51,20 @@ class NuvioRepository(private val context: Context) {
         latest.map { async { toItem(it) } }.awaitAll().filterNotNull()
     }
 
+    /**
+     * Drops the title from "Continua a guardare" here and in Nuvio: deletes every progress row
+     * of it on the server, with the keys Nuvio uses ("tt…" and "tt…_s1e2").
+     */
+    suspend fun remove(item: ContinueItem) {
+        val profile = store.profileId.first()
+        val keys = api.watchProgress(profile, limit = REMOVE_LOOKUP)
+            .filter { it.contentId == item.contentId }
+            .map { p -> if (p.season != null && p.episode != null) "${p.contentId}_s${p.season}e${p.episode}" else p.contentId }
+            .plus(item.contentId)
+            .distinct()
+        api.deleteProgress(profile, keys)
+    }
+
     private suspend fun toItem(p: NuvioApi.Progress): ContinueItem? {
         val fraction = if (p.duration > 0) (p.position.toFloat() / p.duration).coerceIn(0f, 1f) else 0f
         val finished = fraction >= FINISHED
@@ -134,6 +148,8 @@ class NuvioRepository(private val context: Context) {
         const val NUVIO_PACKAGE = "com.nuvio.tv"
         private const val NUVIO_ACTIVITY = "com.nuvio.tv.MainActivity"
         private const val MAX_ITEMS = 15
+        /** Rows read to find every episode of a title being removed. */
+        private const val REMOVE_LOOKUP = 500
         private const val FINISHED = 0.92f
         /** Below this an episode was only just opened: an empty bar reads as broken. */
         private const val MIN_PROGRESS = 0.02f

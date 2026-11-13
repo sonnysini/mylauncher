@@ -103,6 +103,16 @@ class NuvioApi(private val store: NuvioStore) {
         }
     }
 
+    /** Same call Nuvio makes for "Rimuovi": the rows go for every device of the profile. */
+    suspend fun deleteProgress(profileId: Int, keys: List<String>) {
+        if (keys.isEmpty()) return
+        val params = JSONObject()
+            .put("p_keys", JSONArray(keys))
+            .put("p_profile_id", profileId)
+            .put("p_origin_client_id", java.util.UUID.randomUUID().toString())
+        authorized("/rest/v1/rpc/sync_delete_watch_progress", params)
+    }
+
     // --- plumbing -------------------------------------------------------------------------
 
     private suspend fun authorized(path: String, body: JSONObject): String {
