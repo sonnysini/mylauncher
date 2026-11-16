@@ -127,9 +127,15 @@ class VolumeService : Service() {
     }
 }
 
-/** Puts the cut back after a reboot, before anyone opens the launcher. */
+/**
+ * After a reboot (or an update of the app), before anyone opens the launcher: puts the volume
+ * cut back and restarts the Home button guard.
+ */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) Volume.sync(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            Volume.sync(context)
+            app.mylauncher.home.HomeGuard.start(context, boot = intent.action == Intent.ACTION_BOOT_COMPLETED)
+        }
     }
 }

@@ -181,6 +181,9 @@ fun HomeScreen(
 
     var focused by remember { mutableStateOf<Focused?>(null) }
     var menuFor by remember { mutableStateOf<AppEntry?>(null) }
+    var nuvioMenuFor by remember { mutableStateOf<ContinueItem?>(null) }
+    /** Nuvio tile to focus once its menu has left the composition. */
+    var focusAfterNuvioMenu by remember { mutableStateOf<String?>(null) }
     var overlay by remember { mutableStateOf(Overlay.None) }
     var moving by remember { mutableStateOf<String?>(null) }
     var movingArmed by remember { mutableStateOf(false) }
@@ -222,7 +225,7 @@ fun HomeScreen(
     }
     LaunchedEffect(homePressed) {
         homePressed.collect {
-            menuFor = null; overlay = Overlay.None; moving = null
+            menuFor = null; nuvioMenuFor = null; overlay = Overlay.None; moving = null
             viewModel.cancelLogin()
             firstRow = 0
             appsListState.scrollToItem(0)
@@ -241,6 +244,13 @@ fun HomeScreen(
         if (menuFor != null) return@LaunchedEffect
         focusAfterMenu = null
         refocusApp(pkg.ifEmpty { null })
+    }
+    LaunchedEffect(nuvioMenuFor, focusAfterNuvioMenu) {
+        val key = focusAfterNuvioMenu ?: return@LaunchedEffect
+        if (nuvioMenuFor != null) return@LaunchedEffect
+        focusAfterNuvioMenu = null
+        val ok = nuvio.items.any { "nuvio:${it.contentId}" == key } && runCatching { requesterFor(key).requestFocus() }.isSuccess
+        if (!ok) focusHome()
     }
     LaunchedEffect(apps.visible) {
         val app = (focused as? Focused.App)?.app ?: return@LaunchedEffect
@@ -303,7 +313,7 @@ fun HomeScreen(
 
                 @Composable
                 fun NuvioRow() {
-                    RowTitle("Continua a guardare", "Nuvio")
+                    RowTitle("Continua a guardare", "Nuvio · Tieni premuto OK per rimuovere")
                     GridRow(nuvioListState, dims.margin, dims.gap) {
                         when {
                             !nuvio.signedIn -> item(key = "__link") {
@@ -327,6 +337,7 @@ fun HomeScreen(
                                     Modifier
                                         .focusRequester(requesterFor("nuvio:${item.contentId}"))
                                         .onFocusChanged { if (it.isFocused) focused = Focused.Nuvio(item) },
+                                    onLongClick = { nuvioMenuFor = item },
                                 ) { onLaunch(viewModel.nuvioIntent(item)) }
                             }
                         }
@@ -432,6 +443,25 @@ fun HomeScreen(
             }
         }
         }
+        }
+
+        nuvioMenuFor?.let { item ->
+            val key = "nuvio:${item.contentId}"
+            OptionsOverlay(
+                title = item.title,
+                options = listOf(
+                    "Rimuovi da Continua a guardare" to {
+                        val list = nuvio.items
+                        val index = list.indexOfFirst { it.contentId == item.contentId }
+                        val next = list.getOrNull(index + 1) ?: list.getOrNull(index - 1)
+                        nuvioMenuFor = null
+                        focusAfterNuvioMenu = next?.let { "nuvio:${it.contentId}" } ?: ""
+                        viewModel.removeNuvio(item)
+                    },
+                    "Annulla" to { nuvioMenuFor = null; focusAfterNuvioMenu = key },
+                ),
+                onDismiss = { nuvioMenuFor = null; focusAfterNuvioMenu = key },
+            )
         }
 
         menuFor?.let { app ->
@@ -698,10 +728,11 @@ private fun Hero(focused: Focused?, moving: Boolean, modifier: Modifier) {
 }
 
 @Composable
-private fun NuvioCard(item: ContinueItem, modifier: Modifier, onClick: () -> Unit) {
+private fun NuvioCard(item: ContinueItem, modifier: Modifier, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     Card(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier.size(LocalCardDims.current.width, LocalCardDims.current.height),
         shape = CardDefaults.shape(CardShape),
         scale = CardDefaults.scale(focusedScale = 1.08f),

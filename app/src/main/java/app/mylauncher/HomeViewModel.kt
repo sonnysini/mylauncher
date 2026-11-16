@@ -199,6 +199,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun nuvioIntent(item: ContinueItem) = nuvio.openIntent(item)
 
+    /** Hides the tile at once, then deletes it on the server; a failure brings it back on refresh. */
+    fun removeNuvio(item: ContinueItem) {
+        _nuvio.value = _nuvio.value.copy(items = _nuvio.value.items.filterNot { it.contentId == item.contentId })
+        viewModelScope.launch {
+            runCatching { nuvio.remove(item) }
+            refreshNuvio(force = true)
+        }
+    }
+
     /** OpenTV's rows: on every return home and on a timer (faster while a match is live). */
     fun refreshOpenTv() {
         if (openTvJob?.isActive == true) return
