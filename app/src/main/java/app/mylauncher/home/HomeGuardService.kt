@@ -40,6 +40,11 @@ class HomeGuardService : Service() {
             return START_NOT_STICKY
         }
         goForeground()
+        if (intent?.getBooleanExtra(HomeGuard.EXTRA_BOOT, false) == true) {
+            // At power-on the Fire opens its own home before this service runs: nothing in the
+            // log to react to, so look at what is in front now.
+            Thread({ if (amazonHomeInFront()) bringBack() }, "home-guard-boot").start()
+        }
         if (worker?.isAlive != true) {
             running = true
             worker = Thread(::watch, "home-guard").apply { isDaemon = true; start() }
@@ -53,6 +58,17 @@ class HomeGuardService : Service() {
             if (running) SystemClock.sleep(RESTART_DELAY_MS)
         }
     }
+
+    /** Last activity resumed, from the log history: is it the Amazon home? */
+    private fun amazonHomeInFront(): Boolean = runCatching {
+        val p = ProcessBuilder("logcat", "-d", "-b", "events", "-s", "am_set_resumed_activity:I")
+            .redirectErrorStream(true).start()
+        val last = p.inputStream.bufferedReader().useLines { lines ->
+            lines.lastOrNull { "am_set_resumed_activity" in it }
+        }
+        runCatching { p.destroy() }
+        last != null && AMAZON_HOME in last
+    }.getOrDefault(false)
 
     /** One logcat run: from now on (-T 1 skips the history), until it dies. */
     private fun follow() {
@@ -132,9 +148,12 @@ object HomeGuard {
         context.checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
 
     /** Starts the guard if READ_LOGS was granted; harmless to call again. */
-    fun start(context: Context) {
+    const val EXTRA_BOOT = "boot"
+
+    /** [boot]: just powered on, bring the launcher up if the Amazon home is in front. */
+    fun start(context: Context, boot: Boolean = false) {
         if (!canRead(context)) return
-        val intent = Intent(context, HomeGuardService::class.java)
+        val intent = Intent(context, HomeGuardService::class.java).putExtra(EXTRA_BOOT, boot)
         runCatching {
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
         }.onFailure { Log.w("MyLauncherHome", "start", it) }
