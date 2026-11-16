@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "Disinstalla" in the app menu: opens the system confirmation, the user still decides. -->
@@ -14,10 +13,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Home button: follows the system log to see the Amazon home come back. Not granted by
-         installing: once per Fire, `adb shell pm grant app.mylauncher android.permission.READ_LOGS`. -->
-    <uses-permission android:name="android.permission.READ_LOGS"
-        tools:ignore="ProtectedPermissions" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

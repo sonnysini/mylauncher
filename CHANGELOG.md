@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.12.0 — 16 novembre 2026
-- **Tasto Home senza aiuti esterni**: quando torna la home Amazon (Home, Indietro, tasti app del telecomando) è il launcher stesso a rimettersi davanti, anche dopo un riavvio. Le Impostazioni Fire restano raggiungibili. Serve un permesso dato una volta sola per Fire via ADB: `adb shell pm grant app.mylauncher android.permission.READ_LOGS`.
+- **Tasto Home senza aiuti esterni**: quando torna la home Amazon (Home, Indietro, tasti app del telecomando) è il launcher stesso a rimettersi davanti, subito e anche dopo un riavvio. Le Impostazioni Fire restano raggiungibili. Usa il debug ADB della Fire stessa: la prima volta la TV chiede "Consentire il debug USB?" per *mylauncher@firetv*, rispondi Consenti sempre.
 
 ## 0.11.0 — 13 novembre 2026
 - **Continua a guardare parte subito**: OK su una tessera Nuvio apre direttamente le fonti del film o dell'episodio (il prossimo, se quello prima è finito), non più la scheda. Con "Riutilizza ultimo link" o la riproduzione automatica attivi in Nuvio, il video parte da solo.
