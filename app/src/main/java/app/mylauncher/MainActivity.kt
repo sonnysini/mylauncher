@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Software volume cut: (re)start its service if one is set.
         Volume.sync(this)
-        // Home button -> My Launcher, through the Fire's own ADB.
+        // Home button -> My Launcher (needs READ_LOGS, granted once over ADB).
         HomeGuard.start(this)
         registerReceiver(
             packageReceiver,

@@ -92,8 +92,6 @@ dependencies {
     implementation(libs.androidx.tv.material)
 
     implementation(libs.okhttp)
-    // The Fire's own ADB on 127.0.0.1 (Home button guard). Apache-2.0.
-    implementation(libs.dadb)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
