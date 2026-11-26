@@ -15,8 +15,8 @@ android {
         // Fire OS 6 (Fire TV Stick 4K) is Android 7.1.2.
         minSdk = 25
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.13.0"
+        versionCode = 15
+        versionName = "0.13.1"
 
         // Nuvio account backend. Kept out of the public repo: CI reads them from secrets, local
         // builds from the environment. Empty values just hide the Nuvio row.
