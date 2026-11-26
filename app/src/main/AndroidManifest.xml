@@ -25,6 +25,7 @@
     <!-- Android 11+ package visibility: the launcher has to see every launchable app. -->
     <queries>
         <package android:name="app.opentv.sonny" />
+        <package android:name="com.nuvio.tv.sonny" />
         <package android:name="com.nuvio.tv" />
         <intent>
             <action android:name="android.intent.action.MAIN" />

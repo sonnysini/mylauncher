@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.13.0 — 26 novembre 2026
+- **Continua a guardare apre Nuvio Sonny**: OK su una tessera Nuvio apre il fork (com.nuvio.tv.sonny) se è installato, altrimenti il Nuvio ufficiale come prima.
+
 ## 0.12.0 — 16 novembre 2026
 - **Tasto Home senza aiuti esterni**: quando torna la home Amazon (Home, Indietro, tasti app del telecomando) è il launcher stesso a rimettersi davanti, anche dopo un riavvio. Le Impostazioni Fire restano raggiungibili. Serve un permesso dato una volta sola per Fire via ADB: `adb shell pm grant app.mylauncher android.permission.READ_LOGS`.
 

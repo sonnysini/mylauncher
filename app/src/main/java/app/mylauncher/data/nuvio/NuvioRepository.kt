@@ -122,8 +122,9 @@ class NuvioRepository(private val context: Context) {
      * Nuvio it starts playing by itself. Falls back to the detail page if Nuvio can't take it.
      */
     fun openIntent(item: ContinueItem): Intent {
+        val pkg = nuvioPackage()
         val play = Intent(Intent.ACTION_VIEW)
-            .setClassName(NUVIO_PACKAGE, NUVIO_ACTIVITY)
+            .setClassName(pkg, NUVIO_ACTIVITY)
             .putExtra("launchMode", "stream")
             .putExtra("contentId", item.contentId)
             .putExtra("contentType", item.type)
@@ -140,12 +141,19 @@ class NuvioRepository(private val context: Context) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         if (play.resolveActivity(context.packageManager) != null) return play
         return Intent(Intent.ACTION_VIEW, Uri.parse("nuvio://meta?type=${item.type}&id=${Uri.encode(item.contentId)}"))
-            .setPackage(NUVIO_PACKAGE)
+            .setPackage(pkg)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
+    /** Sonny's NuvioTV fork when installed, otherwise the official app. */
+    private fun nuvioPackage(): String =
+        NUVIO_PACKAGES.firstOrNull { pkg ->
+            runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+        } ?: NUVIO_PACKAGES.last()
+
     companion object {
-        const val NUVIO_PACKAGE = "com.nuvio.tv"
+        /** Fork first: same code (activity class keeps the upstream name), different applicationId. */
+        private val NUVIO_PACKAGES = listOf("com.nuvio.tv.sonny", "com.nuvio.tv")
         private const val NUVIO_ACTIVITY = "com.nuvio.tv.MainActivity"
         private const val MAX_ITEMS = 15
         /** Rows read to find every episode of a title being removed. */
