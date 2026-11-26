@@ -41,9 +41,15 @@ class HomeGuardService : Service() {
         }
         goForeground()
         if (intent?.getBooleanExtra(HomeGuard.EXTRA_BOOT, false) == true) {
-            // At power-on the Fire opens its own home before this service runs: nothing in the
-            // log to react to, so look at what is in front now.
-            Thread({ if (amazonHomeInFront()) bringBack() }, "home-guard-boot").start()
+            // At power-on (or after an update killed the launcher) the Amazon home comes up with
+            // no Home press in the log to react to: look at what is in front, a few times because
+            // after a reboot the Amazon home may show up after this service has started.
+            Thread({
+                for (wait in BOOT_CHECKS_MS) {
+                    SystemClock.sleep(wait)
+                    if (amazonHomeInFront()) { bringBack(); break }
+                }
+            }, "home-guard-boot").start()
         }
         if (worker?.isAlive != true) {
             running = true
@@ -59,12 +65,16 @@ class HomeGuardService : Service() {
         }
     }
 
-    /** Last activity resumed, from the log history: is it the Amazon home? */
+    /**
+     * Last activity brought to the front, from the log history: is it the Amazon home?
+     * Android 9 (.47) logs am_set_resumed_activity; Android 7 (.34) doesn't have it, there the
+     * front activity shows up as am_focused_activity / am_restart_activity / am_resume_activity.
+     */
     private fun amazonHomeInFront(): Boolean = runCatching {
-        val p = ProcessBuilder("logcat", "-d", "-b", "events", "-s", "am_set_resumed_activity:I")
-            .redirectErrorStream(true).start()
+        val args = listOf("logcat", "-d", "-b", "events", "-s") + FRONT_TAGS.map { "$it:I" }
+        val p = ProcessBuilder(args).redirectErrorStream(true).start()
         val last = p.inputStream.bufferedReader().useLines { lines ->
-            lines.lastOrNull { "am_set_resumed_activity" in it }
+            lines.lastOrNull { line -> FRONT_TAGS.any { it in line } }
         }
         runCatching { p.destroy() }
         last != null && AMAZON_HOME in last
@@ -140,6 +150,11 @@ class HomeGuardService : Service() {
         const val RESTART_DELAY_MS = 2_000L
         /** START and resume of the same return both match: one jump is enough. */
         const val DEBOUNCE_MS = 800L
+        val FRONT_TAGS = listOf(
+            "am_set_resumed_activity", "am_focused_activity", "am_restart_activity", "am_resume_activity",
+        )
+        /** Pauses before each front check after boot/update: at once, then up to ~1 minute. */
+        val BOOT_CHECKS_MS = longArrayOf(0, 5_000, 10_000, 15_000, 30_000)
     }
 }
 

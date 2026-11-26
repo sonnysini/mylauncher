@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1 — 26 novembre 2026
+- **My Launcher torna davanti dopo un riavvio anche sulla Fire della camera**: su Android 7 il controllo all'accensione non vedeva la home Amazon. Ora la riconosce e ricontrolla per circa un minuto, perché dopo un riavvio la home Amazon può arrivare in ritardo.
+- **Anche dopo un aggiornamento**: quando un aggiornamento chiude il launcher e riappare la home Amazon, il launcher torna davanti da solo.
+
 ## 0.13.0 — 26 novembre 2026
 - **Continua a guardare apre Nuvio Sonny**: OK su una tessera Nuvio apre il fork (com.nuvio.tv.sonny) se è installato, altrimenti il Nuvio ufficiale come prima.
 
